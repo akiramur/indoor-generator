@@ -21,6 +21,43 @@ Claude Code (the skills in `.claude/skills/`) does the research, writes the conf
 Python pipeline generates the output from the config. For the design, see
 [docs/architecture-ja.md](docs/architecture-ja.md) (in Japanese).
 
+## Quick start
+
+You use this tool by talking to [Claude Code](https://code.claude.com/docs/en/overview) **from inside a clone of this repository**.
+The skills that know how to research a building and drive the pipeline live in this repository (`.claude/skills/`, plus `CLAUDE.md`), and Claude Code
+loads them only for the folder it was started in. Started anywhere else, it knows nothing about this tool.
+
+1. Install Claude Code (the terminal CLI, the desktop app and the VS Code extension all work; see its [documentation](https://code.claude.com/docs/en/overview)) and sign in. You also need Python 3.10 or newer (the version it was developed with; older ones are untested) and git. The commands below assume macOS or Linux (on Windows use `.venv\Scripts\...`).
+2. Clone this repository and set it up (details in [Setup](#setup)):
+
+   ```sh
+   git clone https://github.com/akiramur/indoor-generator.git
+   cd indoor-generator
+   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+   cp .env.example .env   # put your Mapbox public token (pk.*) in MAPBOX_ACCESS_TOKEN
+   ```
+
+3. Start Claude Code **in that folder** (in the desktop app or VS Code, open the cloned folder as the project instead):
+
+   ```sh
+   claude
+   ```
+
+4. Type a request into the Claude Code prompt (this is a chat, not a shell command), for example:
+
+   ```
+   Make an indoor map of Marunouchi Building
+   ```
+
+   Claude Code researches the building, writes `configs/<slug>.json`, builds `output/<slug>/indoor.geojson` and starts the live preview
+   at <http://127.0.0.1:8765>. Keep asking for changes in the same session ("Make the north side of 2F a meeting room").
+   Claude Code may ask your permission before it runs commands or fetches web pages; read the prompt and approve what you accept.
+
+Using Claude Code needs a Claude subscription or API account and consumes your usage: researching and building one building takes a few minutes of web
+searches and fetches, and `main.py cost` prints an estimate at API list prices.
+
+To try the pipeline without Claude Code, see [Run the sample](#run-the-sample).
+
 ## Setup
 
 ```sh
@@ -33,12 +70,12 @@ cp .env.example .env   # fill in the tokens
 | `MAPBOX_ACCESS_TOKEN` | Public `pk.*` token, embedded into the preview's `index.html` (if unset, the page asks for one) |
 | `MAPBOX_UPLOAD_TOKEN` | **Secret** `sk.*` token (tilesets:read / write / list). Used only by `publish --upload`, never embedded anywhere |
 
-`.env` is git-ignored. Variables already set in the shell take precedence.
+`.env` is git-ignored. Variables already set in the shell take precedence. The `pk.*` token is written into `output/<slug>/index.html`: give it a URL restriction in the Mapbox console if you share that file.
 
 ### Mapbox account and tokens
 
 1. Sign up for free at [mapbox.com/signup](https://account.mapbox.com/auth/signup/) and sign in. The username you choose there is your Mapbox username.
-2. Open [Access tokens](https://account.mapbox.com/access-tokens/). The **default public token** (`pk.*`) is enough for the preview: put it in `MAPBOX_ACCESS_TOKEN`.
+2. Open [Access tokens](https://console.mapbox.com/account/access-tokens/). The **default public token** (`pk.*`) is enough for the preview: put it in `MAPBOX_ACCESS_TOKEN`.
 3. Only if you want to upload a tileset: click **Create a token**, tick `tilesets:read`, `tilesets:write` and `tilesets:list`, and put the resulting **secret** token (`sk.*`, shown once) in `MAPBOX_UPLOAD_TOKEN`. Never commit it or put it in a web page.
 
 ### `publish.json` (only for `publish` / `viewer`)
@@ -74,7 +111,7 @@ cp publish.example.json publish.json
 
 ### From Claude Code (the normal way)
 
-Open Claude Code in this repository and name a building. The `indoor-map` skill handles research, writing the config,
+In a Claude Code session started inside this repository (see [Quick start](#quick-start)), name a building. The `indoor-map` skill handles research, writing the config,
 building and starting the preview.
 
 - Create: "Make an indoor map of Marunouchi Building"
@@ -101,7 +138,7 @@ Every command prints its result as JSON to stdout, except `report`, which prints
 |---|---|
 | `locate` / `parts` | Find OSM building candidates; fetch `building:part` shapes |
 | `validate` / `build` / `serve` / `undo` | Validate a config, generate, live preview, step back one version |
-| `import-imagemap` | Import real tenant shapes from floor-guide pages drawn as HTML image maps (site-specific importers such as `import-floorguide` exist in some checkouts) |
+| `import-imagemap` | Import real tenant shapes from floor-guide pages drawn as HTML image maps (more site-specific importers can be added as `indoor_gen/importers/*_cli.py`, see the `indoor-importer` skill) |
 | `basemap` / `landmarks` / `align` / `trace` | Place, align and trace floor-map images |
 | `edit-rooms` | Apply hand edits of room shapes made in the preview (move / add / delete vertices, delete / add rooms) and build |
 | `mapbox-footprint` | Use the Mapbox Building's shape (Mapbox Streets `building` layer) as the footprint instead of the OSM outline; `--realign` also moves the plans and floor maps to fit it (one similarity transform), `--dry-run` only reports |
@@ -132,6 +169,9 @@ robots.txt before using them; they send a plain User-Agent, cache every download
 personal use. Do not commit third-party images or SVGs (`configs/plans/*/maps/` is git-ignored); the config keeps the URL.
 `mapbox-footprint` uses Mapbox Streets data through your own token, under the Mapbox terms of service.
 
+Maps built from a third party's floor guide or floor-map image (imported shapes, traces, a published tileset) may be derivative works. Get the
+rights holder's permission before you share or publish them.
+
 ## Tests
 
 ```sh
@@ -140,6 +180,7 @@ personal use. Do not commit third-party images or SVGs (`configs/plans/*/maps/` 
 
 ## Notes
 
+- **Accuracy.** The maps are built from web research and estimates (rooms graded `estimated` / `listed` have no sourced shape) and are approximations. Do not use them for navigation, evacuation or any safety-critical purpose. Provided "as is", without warranty (see `LICENSE`).
 - `publish --upload` replaces one tileset shared by all buildings. If the local `output/` is incomplete, buildings disappear from it, so check the dry-run list first. Production needs `--target prod`.
 - Third-party material such as official floor-map images is never committed (the config keeps the URL; images are cached under `output/`).
 - Map data: footprints and coordinates come from © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL) and, with `mapbox-footprint`, from Mapbox Streets (under the Mapbox terms of service). Keep the attribution when you publish maps built with this tool.

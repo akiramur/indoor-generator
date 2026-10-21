@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+output/
+configs/.history/
+samples/.history/
+# third-party floor-map images (re-create from the sources in each config)
+configs/plans/*/maps/
+# secrets (see .env.example)
+.env
+# local publish settings (copy publish.example.json)
+publish.json

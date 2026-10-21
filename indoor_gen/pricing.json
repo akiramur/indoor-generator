@@ -1,0 +1,11 @@
+{
+  "_comment": "Claude API list prices, USD per million tokens. Model ids match by prefix (claude-haiku-4-5 matches claude-haiku-4-5-20251001). Cache writes are the standard 1.25x (5-minute TTL) / 2x (1-hour TTL) of input; Opus 5.5 checked against the totals Claude Code records in its session logs. fast_multiplier applies to usage.speed == \"fast\". Update when prices change.",
+  "as_of": "2026-09-25",
+  "web_search_per_1k": 10.0,
+  "models": {
+    "claude-opus-5-5":   {"input": 4.0,  "output": 20.0, "cache_write_5m": 5.0,   "cache_write_1h": 8.0,  "cache_read": 0.20, "fast_multiplier": 2.0},
+    "claude-sonnet-5-5": {"input": 2.0,  "output": 10.0, "cache_write_5m": 2.5,   "cache_write_1h": 4.0,  "cache_read": 0.20},
+    "claude-fable-5-1":  {"input": 10.0, "output": 50.0, "cache_write_5m": 12.5,  "cache_write_1h": 20.0, "cache_read": 0.25},
+    "claude-haiku-4-5":  {"input": 1.0,  "output": 5.0,  "cache_write_5m": 1.25,  "cache_write_1h": 2.0,  "cache_read": 0.10}
+  }
+}

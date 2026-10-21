@@ -1,0 +1,10 @@
+{
+  "username": "YOUR_MAPBOX_USERNAME",
+  "default_target": "dev",
+  "targets": {
+    "dev": "indoor-dev",
+    "prod": "indoor"
+  },
+  "minzoom": 14,
+  "maxzoom": 16
+}

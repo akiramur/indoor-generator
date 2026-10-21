@@ -1,0 +1,85 @@
+# indoor-generator
+
+Generates Mapbox indoor maps (facility/structure/floor/room GeoJSON, Mapbox indoor data model) for real buildings from a
+natural-language request: OSM footprint + web research → `configs/<slug>.json` → Python
+pipeline → `output/<slug>/indoor.geojson` + live preview, then refined through conversation.
+
+**For any request to create or change an indoor map, use the `indoor-map` skill**
+(`.claude/skills/indoor-map/SKILL.md`).
+Its follow-ups are separate skills, loaded only when needed: `indoor-floor-image` (overlay / align / trace a floor-map image),
+`indoor-importer` (new floor-guide site importers), `indoor-quality` (sourcing grades, `report` / `compare` / `cost`),
+`indoor-publish` (tileset upload; only when the user asks).
+
+Official Mapbox skills vendored from [mapbox/mapbox-agent-skills](https://github.com/mapbox/mapbox-agent-skills)
+(MIT, commit `f71cd72`; `SKILL.md` + `references/` only — update by re-copying, don't edit in place):
+- `mapbox-data-visualization-patterns` — when changing GL JS layers/expressions in `templates/preview.html` (fill-extrusion, feature-state)
+- `mapbox-web-performance-patterns` — preview load time, `setData` reloads, large GeoJSON
+- `mapbox-token-security` — anything touching how the token is passed to / embedded in `index.html`
+
+## Layout
+- `main.py` — CLI: `publish` (all built buildings → one Mapbox tileset `<username>.indoor` via MTS; dry run unless `--upload`), `locate`, `parts`, `validate`, `build`, `serve`, `undo`, `import-floorguide` (internal only), `import-imagemap`,
+  `basemap` / `landmarks` / `align` / `trace` (floor-map image + point pairs from landmarks, written by the agent; `trace` turns pixel outlines into a plan), `cost` (Claude usage per building),
+  `report` (how well each room is sourced: traced / listed / estimated / derived, per floor, and the weakest rooms to research next),
+  `compare` (two builds of one building, e.g. per model: cost, sourced share, alignment, room/category agreement)
+- `indoor_gen/` — `schema.json` (config schema), `config.py`, `fetch_building.py` (Nominatim/Overpass),
+  `geo_utils.py` (UTM + main-axis frame), `generate_geojson.py` (area-exact splitting, diff),
+  `history.py` (undo snapshots), `build_preview.py` + `templates/preview.html` + `templates/i18n.json` (the preview is Japanese / English: English by default; `?lang=ja` or the saved choice picks Japanese, the top bar's 日本語 / EN button switches and reloads; the page is written in English — `tl('English {x}', {x})` in the script, static markup swapped by `translateStatic` — and `i18n.json` holds `ja` (English text → Japanese), `categories` (room category labels) and `names` (names the generator makes, 共用部・通路 / 未割当: the data keeps the Japanese, so this one maps Japanese → English). A new UI text is written in English and needs its `ja` entry — `tests/test_preview_i18n.py` checks it). The preview has one layout for viewing and editing: a top bar (floor, "Edit floor"), the facility (name, building picker, live dot), a "Display" section with the source-data comparison and tabs (Legend / Source / History) on the left, the selected room and the floor's rooms on the right; the edit mode keeps the left and swaps the right for the tool details + Table / JSON), `server.py` (SSE live reload, selection; serving `/` first re-renders a page older than `preview.html` from the new template, keeping its data — `build_preview.refresh`)
+- `indoor_gen/usage_cost.py` + `pricing.json` — estimated Claude cost per building from Claude Code's session logs
+  (`~/.claude/projects/<repo path>/`), turn by turn; written to `output/<slug>/cost.json` on build and shown in the preview.
+  Update `pricing.json` when list prices change
+- `indoor_gen/publish.py` + `publish.json` (git-ignored, from `publish.example.json`; `username`, `targets` dev → `indoor-dev` / prod → `indoor`, `default_target`: dev, zooms; `--target prod` reaches production) — concatenates every `output/*/indoor.geojson` (samples skipped)
+  into one line-delimited GeoJSON tagged with `building`/`building_name`, replaces the tileset source, updates the recipe,
+  publishes and waits. Warns (never blocks) about buildings whose estimated + guessed-shape room area is above `--warn-weak-pct` (default 50). Needs a **secret** `sk.*` token (tilesets:read/write/list) in `$MAPBOX_UPLOAD_TOKEN` — never in
+  `index.html`. Styles are never modified; the result prints a source + layer snippet. `main.py viewer` writes
+  `output/_publish/viewer-<tileset>.html` (published tileset + IndoorControl, official style) to check an upload Upload only when the user asks
+- `indoor_gen/room_edit.py` — hand edits made in the preview (edit mode is laid out like geojson.io: a top bar with the tools (select / vertices, polygon, rectangle, move · rotate · scale of the selected rooms, delete, undo; a Rooms / Floor map switch changes what is edited: in the floor-map mode the right pane holds the nudge controls and their save, and the room tools / Table / JSON step aside; saving the map needs the room edits saved first), import / export and save / end, the facility and "Display" on the left, the tool details above Table / JSON on the right (Table is the room list: swatch, name, category, area, Added / Changed / Deleted tags; JSON is the same working set) (choosing another floor in IndoorControl moves the edit to it, keeping the mode; with unsaved edits it asks first and goes back to the edited floor if declined) (typing valid JSON or editing a cell edits the same working set as the map; rename / re-category go out as `update` with `name` / `category`); move / add / delete vertices, delete / add / merge rooms; aligning several rooms to the first selected (edges, widths, facing walls closed up; done in the browser), merging unites shapes in the browser with polygon-clipping, loaded from jsDelivr on first use, and saves as an `update` with a new `name` / `category` plus `delete`s): `POST /room-edits` → `output/<slug>/room_edits.json` → `main.py edit-rooms` writes
+  them into the floor's plan GeoJSON (`geometry_source: manual`; a floor without a plan gets `plans/<slug>/<floor>-manual.geojson`, an edited ratio room moves from `rooms` into the plan) and builds. `undo` restores the config only; plan files are backed up in `configs/.history/plans/`
+- `indoor_gen/geojsonio.py` — round trip through geojson.io: `main.py export-floor <config> --level N` (or the edit mode's "Export", `GET /floor-export`) writes the floor's rooms (`id` = config room id, `name`, `category`); `import-floor <config> --file <edited> [--dry-run]` (edit mode: "Import", `POST /floor-import`) diffs it against the build: changed shape / name → `update`, no `id` + `name` → `add`, missing → `delete`, then `edit-rooms`' path (`room_edit.apply_edits`) and build. Vertex-level edits only; image alignment / nudge stay in the preview
+- `indoor_gen/mapbox_building.py` + `realign.py` — `main.py mapbox-footprint`: the footprint becomes the Mapbox Building's shape (Streets v8 tile, own protobuf reader; saved as `plans/<slug>/footprint.geojson`, `building.source` → geojson); `--realign` fits one similarity transform of the plans onto it and moves every plan and floor map (config corners, point pairs, and the map corners an importer keeps in the plan) by it; `--dry-run` only reports. Needs `$MAPBOX_ACCESS_TOKEN`. `main.py nudge-map <config> --rotate-deg / --scale / --east-m / --north-m [--level N]` moves every plan and floor map (with `--level`, only that floor's plan, outline and map) (and, with `building.footprint_follows_map: true` — a footprint and floor `outline`s drawn from the floor maps, e.g. Haneda T2 — the footprint and outline files too) by a small hand-set amount (rotation counter-clockwise about the footprint's centre) when the fit needs a last touch; the preview's edit mode ("Edit floor" → the "Floor map" mode) has a rotation slider and drag (drag the map, scale with the corner / edge handles; scale 0.2–5×, shifts ±1000 m), `POST /nudge`: the shown floor map moves live; "Save this floor only" moves that floor's plan and map (`level`), "Apply to all floors" every floor
+- `indoor_gen/align.py` — image corners from point pairs (`output/<slug>/alignment.json`, saved by the preview);
+  A floor map is never bent to the footprint: `align.auto_fit` (used by `main.py basemap`; `--map-up` / `--north-deg` (a north arrow's angle, any value) / `--like-level` fix which way is up, a near-symmetric building is reported as ambiguous) only scales, turns and moves it so the drawing's outline covers the footprint (IoU); point pairs are `similarity` only
+  `indoor_gen/crop.py` — on build the shown floor-map image is trimmed to the floor's extent + a small margin (legend / blank
+  margins out); the full image stays as `source_url` for alignment, the trimmed rect is `crop_px` in the metadata
+- `indoor_gen/quality.py` (sourcing grades) and `indoor_gen/compare.py` (two builds of one building) back `report` / `compare`
+- `indoor_gen/georef.py` — fit a floor-plan drawing onto the footprint; `indoor_gen/importers/` — site importers
+  (generic HTML image-map floor pages → plan GeoJSON with real tenant outlines; `common.py` holds what importers and `main.py` share. The marunouchi.com floor-guide importer — `marunouchi_floorguide.py`, its `import-floorguide` command in `marunouchi_cli.py`, `tools/svg_pictogram_sheet.py`, `tests/test_floorguide_svg.py` — exists only in the internal checkout: `tools/export_public.sh` leaves it out, and `main.py` registers any `importers/*_cli.py` it finds)
+- `tools/detect_pictograms.py` — candidate positions of round or square pictograms (escalator / elevator / stairs / ATM / toilet) in image-only floor maps, from a legend; look at its contact sheets, then write the accepted points as `point` entries of the `*-trace.json` (about 2 min for 3 floors of 3000+ px); also `overlay_trace.py` (draw a `*-trace.json` on its image to check it), `crop_grid.py` (crop + pixel grid to read coordinates), `svg_pictogram_sheet.py` (internal only: signatures of the marunouchi.com SVG pictograms, to fill `PICTOGRAMS`), `add_points.py` (pixel positions of pictograms / stairs → a floor's `-trace.json`, or straight into an importer plan through its corners), `gen_seat_plan.py` (seat blocks — rows × seat numbers in a hall's own frame, `configs/plans/<slug>/seat-spec.json` — → a plan GeoJSON of point seats, `icon: seat` with `section` / `row` / `number`; our own icon, drawn to scale in the preview; first used for 東京国際フォーラム ホールC), `svg_zones.py` (a vector seating chart — SVG, or a PDF page through `pdftocairo -svg` — → a floor's `*-trace.json` of zone outlines by fill colour, named by a legend JSON; place its image with `main.py basemap --outline-trace <that trace>`, which fits the zones' hull to the footprint; first used for 東京ドーム, a zone-legend JSON), `screenshot_preview.py` (headless-Chrome screenshot of the running preview: building / floor / camera / checkboxes; needs the optional `playwright`)
+- `configs/` — agent-written configs (source of truth); `configs/plans/<slug>/` — plan GeoJSON per floor;
+  `configs/.history/` — snapshots
+- `output/<slug>/` — generated files; `selection.json` = room clicked in the browser,
+  `alignment.json` = floor-map point pairs (written by the agent, applied by `main.py align --apply`),
+  `cost.json` = estimated Claude usage cost (refreshed by the server on each page load),
+  `quality.json` = sourcing grades per floor and the weak rooms (written by `build` and `report`; `indoor_gen/quality.py`)
+
+- `README.md` (English) / `README-ja.md` — human-facing overview and setup; `docs/architecture-ja.md` — architecture document (Japanese); update them when the pipeline, CLI or skills change
+
+## Footprint policy
+The building's footprint is the Mapbox Building (`mapbox-footprint`; OSM only when its shape is the old building, then drawn from the floor plan). It is never redrawn from a floor map / schematic, and traced plan rooms are never dropped or clipped for lying outside it: they stick out, and the floor slab / wall follow them (the `trace` output reports the share inside). Floor `outline`s drawn from a floor map are optional and carry `properties.follows_map: true` so `nudge-map` moves them with the maps (`building.footprint_follows_map: true` is only for a footprint that is itself drawn from the maps).
+
+## Spec references
+- [Indoor mapping guide](https://docs.mapbox.com/help/dive-deeper/indoor-mapping/) — the spec for authoring custom GeoJSON (`type` = `facility|structure|floor|room`, walls are `type: room` + `class: wall`)
+- [Mapbox indoor-v3 tileset reference](https://docs.mapbox.com/data/tilesets/reference/mapbox-indoor-v3/) — Mapbox's own published tileset (layers, `class` / `icon` vocabulary); check it first for any `class` question
+- [Build an indoor map with your own data in Mapbox GL JS](https://dev.to/mapbox/build-an-indoor-map-with-your-own-data-in-mapbox-gl-js-127m) — hands-on tutorial (metadata properties, `indoor` block, `IndoorControl`); a companion to the above, not a spec
+
+## Feature model
+`indoor.geojson` follows Mapbox's indoor data model ([guide](https://docs.mapbox.com/help/dive-deeper/indoor-mapping/)):
+`facility` > `structure` > `floor` > `room`, linked by `facility_id` / `structure_ids` / `floor_id`; ids are unique across
+buildings (`facility-<slug>`, `structure-<slug>`, `floor-<slug>-<level>` with `b1` for basements, `room-<slug>-<config id>`;
+the config's own id stays in `room_id`). Floors carry `name` (1, B1), `description`, `z_index` (0 = 1F), `is_default` and
+`conflicted_floor_ids` (all other floors); rooms carry `class` (indoor-v3 vocabulary where one exists, else our `category`);
+each floor has an exterior `wall` (`type: room`, `class: wall`, `wall_height`). `z_offset` is the data model's (relative to the floor, so 0; the floor's height is its `ground_z_offset`); our `lift` is the
+absolute metres above ground for the flat fill / walls. Our own keys (`level`, `floor_name`,
+`category`, `base_height`, `height`, `color`, …) stay for tools and the floor-map overlay. Rooms with a sourced shape also get a point POI (`shape_type: poi`, `icon`): facilities (toilet / lift / stairs / ATM) by name or floor-map pictogram, and shops by category + name (`shop`, `restaurant`, `cafe`, `bank`; our own `hospital` / `pharmacy`, whose room `class` is `healthcare`) — `generate_geojson.shop_icon`. The preview uses Mapbox's own
+indoor mechanism (Standard style + `indoor` block + clip layer + `IndoorControl` + `is-active-floor`; GL JS 3.32): the chosen
+floor is drawn flat at street level with its exterior wall, and the panels follow IndoorControl through the (experimental)
+`map.style.indoorManager` `selector-update` event. Config room ids
+are what you edit; the build output and `selection.json` show `room_id`.
+
+## Commands
+- Setup: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
+- Tests: `.venv/bin/python -m pytest -q`
+- Example: `.venv/bin/python main.py build samples/building_config.json && .venv/bin/python main.py serve marubiru-sample`
+
+Secrets and settings go in `.env` (git-ignored, loaded by `main.py`; template: `.env.example`; shell variables win).
+Mapbox token: `$MAPBOX_ACCESS_TOKEN` (public pk.* token; embedded into index.html) or entered in the page.
+OSM APIs: respect Nominatim's 1 req/s; footprints are cached in `output/<slug>/footprint_cache.geojson`.

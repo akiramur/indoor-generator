@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Indoor building config",
+  "type": "object",
+  "required": ["building", "floors"],
+  "additionalProperties": false,
+  "properties": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Output directory name. Defaults to the config file name."
+    },
+    "building": {
+      "type": "object",
+      "required": ["name", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "source": {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"enum": ["query", "latlon", "osm_id", "geojson"]},
+            "query": {"type": "string"},
+            "lat": {"type": "number", "minimum": -90, "maximum": 90},
+            "lon": {"type": "number", "minimum": -180, "maximum": 180},
+            "osm_type": {"enum": ["way", "relation"]},
+            "osm_id": {"type": "integer", "minimum": 1},
+            "path": {"type": "string"},
+            "search_radius_m": {"type": "number", "exclusiveMinimum": 0}
+          },
+          "allOf": [
+            {"if": {"properties": {"type": {"const": "query"}}}, "then": {"required": ["query"]}},
+            {"if": {"properties": {"type": {"const": "latlon"}}}, "then": {"required": ["lat", "lon"]}},
+            {"if": {"properties": {"type": {"const": "osm_id"}}}, "then": {"required": ["osm_type", "osm_id"]}},
+            {"if": {"properties": {"type": {"const": "geojson"}}}, "then": {"required": ["path"]}}
+          ]
+        },
+        "crs": {"type": "string", "description": "\"auto\" (UTM zone from centroid) or an EPSG code such as \"EPSG:6677\"."},
+        "orientation": {
+          "oneOf": [{"enum": ["auto", "north"]}, {"type": "number"}],
+          "description": "auto: align cuts to the building's main axis; north: grid north; number: rotation in degrees."
+        },
+        "total_floors": {"type": "integer", "minimum": 1},
+        "basement_floors": {"type": "integer", "minimum": 0},
+        "footprint_follows_map": {"type": "boolean", "description": "The footprint (a GeoJSON file) and the floors' `outline` files were drawn from the floor maps, so `nudge-map` / `mapbox-footprint --realign` move them together with the maps and plans (default: the footprint is the real shape and stays put)."}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "request": {"type": "string"},
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "url"],
+            "properties": {
+              "id": {"type": "string"},
+              "url": {"type": "string"},
+              "note": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "floor_height": {"type": "number", "exclusiveMinimum": 0},
+        "ceiling_gap": {"type": "number", "minimum": 0},
+        "wall_gap": {"type": "number", "minimum": 0},
+        "palette": {"type": "array", "items": {"$ref": "#/$defs/color"}, "minItems": 1}
+      }
+    },
+    "floors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/floor"}
+    }
+  },
+  "$defs": {
+    "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+    "floor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {"type": "integer"},
+        "levels": {"type": "array", "items": {"type": "integer"}, "minItems": 1},
+        "name": {"type": "string"},
+        "name_template": {"type": "string", "description": "e.g. \"{level}F\"; used for floors expanded from levels."},
+        "height": {"type": "number", "exclusiveMinimum": 0, "description": "Floor-to-floor height in metres."},
+        "copy_from": {"type": "integer", "description": "Copy rooms (and plan) from this level."},
+        "outline": {"type": "string", "description": "GeoJSON (WGS84) polygon this floor is limited to, relative to the config file — e.g. a tower's OSM building:part. Everything outside it is not part of the floor; ratios are shares of this area."},
+        "outline_clip": {"type": "boolean", "description": "Default true: the outline is cut to the building footprint. False: the outline is the floor's own shape and may stick out of the footprint (a floor drawn from a floor map that disagrees with the footprint)."},
+        "plan": {"type": "string", "description": "GeoJSON (WGS84) of rooms with real shapes, relative to the config file. Features need properties.id and properties.name (optional: category, color, source, confidence, void). Ratio rooms then divide the remaining area; anything left becomes a common-area room."},
+        "basemap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["image", "corners"],
+          "description": "A floor-map image shown under this floor in the preview (overrides a plan's own basemap). Written from `main.py basemap` / `main.py align` output.",
+          "properties": {
+            "image": {"type": "string", "description": "Image path relative to the config file (e.g. plans/<slug>/maps/3F.png) or an http(s) URL."},
+            "corners": {"type": "array", "minItems": 4, "maxItems": 4, "description": "[lng, lat] of the image's top-left, top-right, bottom-right, bottom-left.",
+                        "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}}},
+            "source": {"type": "string", "description": "provenance source id of the image"},
+            "alignment": {"type": "object", "description": "How the corners were found (mode, pairs, rms_m); kept for reference."},
+            "auto_corners": {"type": "array", "minItems": 4, "maxItems": 4, "description": "The automatic placement before the first point-pair alignment; `main.py align --reset` (the preview's 「自動配置に戻す」) restores it.",
+                             "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}}}
+          }
+        },
+        "rooms": {"type": "array", "items": {"$ref": "#/$defs/room"}}
+      },
+      "oneOf": [
+        {"required": ["level"], "not": {"required": ["levels"]}},
+        {"required": ["levels"], "not": {"required": ["level"]}}
+      ],
+      "anyOf": [{"required": ["rooms"]}, {"required": ["copy_from"]}, {"required": ["plan"]}]
+    },
+    "room": {
+      "type": "object",
+      "required": ["name", "side"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"},
+        "name": {"type": "string"},
+        "category": {
+          "type": "string",
+          "description": "retail | restaurant | office | lobby | service | circulation | connector (stairs, elevators, escalators) | parking | meeting | hall | other (free text allowed)"
+        },
+        "side": {"enum": ["west", "east", "north", "south", "rest"]},
+        "ratio": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Share of the whole floor area."},
+        "color": {"$ref": "#/$defs/color"},
+        "subdivide": {
+          "type": "object",
+          "required": ["count"],
+          "additionalProperties": false,
+          "properties": {
+            "count": {"type": "integer", "minimum": 2, "maximum": 50},
+            "axis": {"enum": ["long", "short"]}
+          }
+        },
+        "flat": {"type": "boolean", "description": "Draw at floor level only instead of full ceiling height (corridors, open areas)."},
+        "void": {"type": "boolean", "description": "Reserve this area but draw nothing (atrium, open air, the part of the podium a tower does not cover)."},
+        "source": {"type": "string", "description": "Id from provenance.sources."},
+        "confidence": {"enum": ["sourced", "estimated"]}
+      },
+      "if": {"properties": {"side": {"const": "rest"}}},
+      "then": {"not": {"required": ["ratio"]}},
+      "else": {"required": ["ratio"]}
+    }
+  }
+}

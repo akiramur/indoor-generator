@@ -1,0 +1,2867 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__ Indoor</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js"></script>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: rgba(255,255,255,0.94); --text: #1d1d1f; --muted: #6b6b70;
+    --line: #e2e2e0; --accent: #2f6fde; --accent-text: #fff; --sel: #ffd400; --chg: #00c2e0;
+    --ok: #2ea44f; --warn: #d4a017;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151517; --panel: rgba(28,28,31,0.94); --text: #ececee; --muted: #9a9aa2;
+      --line: #34343a; --accent: #5b8ef0;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  #map { position: absolute; top: var(--tb); bottom: 0; left: var(--lw); right: var(--rw); }
+  section { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  section:last-child { border-bottom: 0; }
+  h1 { font-size: 15px; margin: 0 0 2px; }
+  #building-picker { max-width: 180px; font-size: 12px; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .dot.live { background: var(--ok); }
+  #floor-status { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+  .legend div { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .shape-sources { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+  .shape-sources li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+  .shape-sources .sub { color: #777; font-size: 11px; }
+  .shape-sources li > span:last-child { white-space: nowrap; }
+  #info dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; font-size: 12px; }
+  #info dt { color: var(--muted); }
+  #info dd { margin: 0; word-break: break-all; }
+  #info .poi-badge { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; color: var(--muted); }
+  #info .poi-badge i { display: inline-block; min-width: 18px; height: 18px; padding: 0 3px; box-sizing: border-box; border-radius: 9px;
+    border: 1.5px solid #fff; color: #fff; font: bold 10px/15px sans-serif; text-align: center; font-style: normal; }
+  #info code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .hint { margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(47,111,222,.1); font-size: 12px; }
+  .empty { color: var(--muted); font-size: 12px; }
+  #sources { list-style: none; margin: 0; padding: 0; font-size: 12px; max-height: 220px; overflow-y: auto; }
+  #sources li { padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  #sources li:last-child { border-bottom: 0; }
+  #sources a { color: var(--accent); text-decoration: none; font-weight: 600; word-break: break-all; }
+  #sources a:hover { text-decoration: underline; }
+  #sources .sid { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+  #sources .note { display: block; margin-top: 1px; }
+  #log { list-style: none; margin: 0; padding: 0; font-size: 12px; max-height: 180px; overflow-y: auto; }
+  #log li { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+  #log li:last-child { border-bottom: 0; }
+  #log time { color: var(--muted); margin-right: 6px; }
+  #nudge { margin-top: 10px; }
+  #nudge[hidden] { display: none; }
+  .slider { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; font-size: 12px; margin-bottom: 8px; }
+  .slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  .slider output { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .note { color: var(--muted); font-size: 11px; }
+  label.toggle { display: flex; gap: 6px; align-items: center; font-size: 12px; margin-top: 8px; color: var(--muted); }
+  #token-gate { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: var(--bg); }
+  #token-gate form { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; width: min(420px, calc(100% - 32px)); }
+  #token-gate input { width: 100%; padding: 8px; margin: 10px 0; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text); font: inherit; }
+  #token-gate button { padding: 6px 14px; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-text); font: inherit; cursor: pointer; }
+  .btn { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 6px;
+    padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .row-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  #cost-usd { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  #cost-usd small { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+  #cost-detail { margin-top: 4px; }
+  /* Floor editing, laid out like geojson.io: top bar (tools, import / export, save / end), feature list on the left,
+     JSON / Table on the right; the map takes the middle. */
+  :root { --tb: 46px; --lw: 280px; --rw: 360px; }
+  #topbar { position: absolute; top: 0; left: 0; right: 0; height: var(--tb); display: flex; align-items: center; gap: 12px;
+    padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 4; }
+  .tb-group[hidden] { display: none; }
+  /* what only the edit mode has / only the view has */
+  body:not(.editing) #edit-mode, body:not(.editing) #edit-tools, body:not(.editing) #gio-group, body:not(.editing) #edit-end-group { display: none; }
+  body.editing #edit-section, body.editing #rview, body:not(.editing) #redit { display: none; }
+  .pane-toggle { display: none; }
+  #view-opts { flex: none; border-bottom: 1px solid var(--line); }
+  #view-opts summary { padding: 9px 12px; cursor: pointer; font-weight: 600; font-size: 12px; color: var(--muted); }
+  #view-opts .opts { padding: 0 12px 12px; }
+  #view-opts .opts .toggle:first-child { margin-top: 0; }
+  #rview, #redit { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  #rview #info { flex: none; max-height: 45%; overflow-y: auto; }
+  .vpage { flex: 1; overflow-y: auto; min-height: 0; }
+  .vpage[hidden] { display: none; }
+  #topbar .spacer { flex: 1; }
+  #topbar .tb-group { display: flex; gap: 6px; align-items: center; }
+  #edit-mode { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  #edit-mode button { height: 30px; padding: 0 12px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+  #edit-mode button + button { border-left: 1px solid var(--line); }
+  #edit-mode button:hover:not(:disabled) { background: rgba(127,127,127,.18); }
+  #edit-mode button.on, #edit-mode button.on:hover:not(:disabled) { background: var(--accent); color: var(--accent-text); }
+  #edit-mode button:disabled { opacity: .35; cursor: default; }
+  /* floor-map mode: only the floor map's controls; the room tools, import / export, JSON / Table step aside */
+  body.map-tool #edit-tools, body.map-tool #gio-group, body.map-tool #edit-save { display: none; }
+  body.map-tool #rpane .tabs, body.map-tool #tab-json, body.map-tool #tab-table { display: none; }
+  body.map-tool #edit-map-pane { max-height: none; flex: 1; border-bottom: 0; }
+  .catbtn { display: inline-flex; align-items: center; gap: 6px; width: 100%; font: inherit; font-size: 12px; padding: 2px 6px; text-align: left;
+    border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--text); cursor: pointer; }
+  .catbtn::after { content: '▾'; margin-left: auto; color: var(--muted); }
+  .catbtn:disabled { cursor: default; opacity: .6; }
+  .catbtn .sw, #cat-menu .sw { flex: none; width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(0,0,0,.25); }
+  #edit .catbtn { width: auto; min-width: 120px; padding: 3px 8px; }
+  #cat-menu { position: fixed; z-index: 10; min-width: 150px; max-height: 60vh; overflow-y: auto; padding: 4px; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 18px rgba(0,0,0,0.18); backdrop-filter: blur(6px); }
+  #cat-menu[hidden] { display: none; }
+  #cat-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border: 0; border-radius: 5px; background: transparent;
+    color: inherit; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+  #cat-menu button:hover { background: rgba(127,127,127,.18); }
+  #cat-menu button.cur { background: rgba(47,111,222,.16); }
+  #attr-table tr:not(.del) { cursor: default; }
+  #attr-table tr.locked td { opacity: .55; }
+  #attr-table .tag { font-size: 10px; padding: 0 6px; border-radius: 8px; color: #fff; white-space: nowrap; }
+  #attr-table .tag.new { background: #2a9d5c; } #attr-table .tag.mod { background: #2f6fde; } #attr-table .tag.del { background: #d33; }
+  #fl-ul li.hd { cursor: default; color: var(--muted); font-size: 11px; padding-top: 12px; }
+  #fl-ul li.hd:hover { background: transparent; }
+  #edit-tools { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  #edit-tools .tool { width: 34px; height: 30px; padding: 0; border: 0; background: transparent; color: var(--text); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; }
+  #edit-tools .tool + .tool { border-left: 1px solid var(--line); }
+  #edit-tools .tool:hover:not(:disabled) { background: rgba(127,127,127,.18); }
+  #edit-tools .tool.on, #edit-tools .tool.on:hover:not(:disabled) { background: var(--accent); color: var(--accent-text); }
+  #edit-tools .tool:disabled { opacity: .35; cursor: default; }
+  #edit-tools .tool svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+  #edit-tools .sep { align-self: stretch; width: 6px; background: rgba(127,127,127,.25); }
+  #flist, #rpane { position: absolute; top: var(--tb); bottom: 0; display: flex; flex-direction: column; background: var(--panel);
+    color: var(--text); z-index: 3; min-height: 0; }
+  #flist { left: 0; width: var(--lw); border-right: 1px solid var(--line); }
+  #rpane { right: 0; width: var(--rw); border-left: 1px solid var(--line); }
+  .pane-head { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  section.fac { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 12px 12px 10px; flex: none; }
+  section.fac .fac-name { flex: 1 1 100%; display: flex; align-items: baseline; gap: 8px; }
+  section.fac #title { font-size: 15px; min-width: 0; }
+  #flist .tabs { flex: none; }
+  #rooms { display: flex; flex-direction: column; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+  #fl-ul { list-style: none; margin: 0; padding: 4px; overflow-y: auto; flex: 1; font-size: 12px; }
+  #fl-ul li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+  #fl-ul li:hover { background: rgba(127,127,127,.12); }
+  #fl-ul li.cur { background: rgba(47,111,222,.16); }
+  #fl-ul li.multi { background: rgba(224,138,0,.18); }
+  #fl-ul li.locked { opacity: .55; }
+  #fl-ul li.del .nm { text-decoration: line-through; }
+  #fl-ul .sw { flex: none; width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(0,0,0,.25); }
+  #fl-ul .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #fl-ul .sub { flex: none; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  #fl-ul .tag { flex: none; font-size: 10px; padding: 0 6px; border-radius: 8px; color: #fff; }
+  #fl-ul .tag.new { background: #2a9d5c; } #fl-ul .tag.mod { background: #2f6fde; } #fl-ul .tag.del { background: #d33; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tabs .tab { flex: 1; padding: 9px 0; border: 0; background: transparent; color: var(--muted); font: inherit; cursor: pointer;
+    border-bottom: 2px solid transparent; }
+  .tabs .tab.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  #tab-json { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  #tab-json[hidden], #tab-table[hidden] { display: none; }
+  #json-text { flex: 1; width: 100%; resize: none; border: 0; padding: 10px 12px; background: transparent; color: var(--text);
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; outline: none; tab-size: 2; }
+  #json-err { padding: 6px 12px; font-size: 12px; color: #d33; border-top: 1px solid var(--line); }
+  #json-err:empty { display: none; }
+  #tab-table { flex: 1; overflow: auto; min-height: 0; }
+  #attr-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  #attr-table th { position: sticky; top: 0; background: var(--panel); text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); color: var(--muted); font-weight: 500; }
+  #attr-table td { padding: 3px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  #attr-table td.id { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 11px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #attr-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  #attr-table tr.cur td { background: rgba(47,111,222,.12); }
+  #attr-table tr.del td { opacity: .5; text-decoration: line-through; }
+  #attr-table input, #attr-table select { width: 100%; font: inherit; font-size: 12px; padding: 2px 4px; border: 1px solid var(--line);
+    border-radius: 4px; background: transparent; color: var(--text); }
+  /* the tool details (what the tool does, merge / align; the floor-map controls) sit above JSON / Table in the right pane */
+  #edit { display: none; flex-direction: column; gap: 8px; padding: 10px 12px; flex: none; max-height: 45%; overflow-y: auto;
+    border-bottom: 1px solid var(--line); }
+  #edit.open { display: flex; }
+  body.map-tool #edit { display: none; }
+  #edit .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+  #edit input, #edit select { font: inherit; font-size: 12px; padding: 3px 6px; border: 1px solid var(--line);
+    border-radius: 6px; background: transparent; color: var(--text); }
+  #edit-step, #edit-msg { font-size: 12px; }
+  #edit-warn { font-size: 12px; color: #d33; font-weight: 600; }
+  #edit-msg { color: var(--muted); max-height: 4.4em; overflow-y: auto; }
+  #edit #edit-new { display: none; }
+  #edit #edit-align[hidden] { display: none; }
+  #edit #edit-new.open { display: flex; }
+  #edit-map-pane { display: none; flex: none; max-height: 55%; overflow-y: auto; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 12px; }
+  #edit-map-pane.open { display: block; }
+  #edit-map-pane > strong { display: block; margin-bottom: 6px; }
+  @media (max-width: 900px) {   /* narrow screens: the panes would leave no map; they open over it */
+    #map { left: 0; right: 0; }
+    #flist, #rpane { display: none; z-index: 5; width: min(320px, 88%); }
+    body.show-l #flist, body.show-r #rpane { display: flex; }
+    .pane-toggle { display: inline-block; }
+    #topbar { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<header id="topbar">
+  <button class="btn pane-toggle" id="toggle-l" title="Show / hide the facility panel (display, legend, sources, history)">Facility</button>
+  <select id="building-picker" hidden aria-label="Choose a facility"></select>
+  <div id="edit-mode" role="tablist" aria-label="What to edit">
+    <button data-mode="room" class="on" role="tab" title="Edit the shape, name and category of rooms">Rooms</button>
+    <button data-mode="map" role="tab" title="Adjust the position, rotation and size of the floor map (the official drawing)">Floor map</button>
+  </div>
+  <div id="edit-tools" role="toolbar" aria-label="Editing tools">
+  <button class="tool" data-tool="select" title="Select / edit vertices (Esc): pick a room, drag its vertices or edges. Click on an edge to add a vertex"><svg viewBox="0 0 24 24"><path d="M6 3l12 8-5.5 1.5L16 19l-2.5 1.2-3.5-6.5L6 17z"/></svg></button>
+  <button class="tool" data-tool="polygon" id="edit-tool-polygon" title="Draw a polygon: click the vertices in order, finish on the first point or with Enter"><svg viewBox="0 0 24 24"><path d="M12 3.5l8 6-3 10.5H7L4 9.5z"/></svg></button>
+  <button class="tool" data-tool="rect" title="Draw a rectangle: click two opposite corners, or drag"><svg viewBox="0 0 24 24"><rect x="4.5" y="6.5" width="15" height="11"/></svg></button>
+  <button class="tool" data-tool="transform" title="Move / rotate / scale the selected rooms: drag to move, corners to scale, the green dot to rotate (Shift snaps to 15°)"><svg viewBox="0 0 24 24"><path d="M12 2.5l3 3h-2v4h4v-2l3.5 3.5-3.5 3.5v-2h-4v4h2l-3 3-3-3h2v-4H7v2L3.5 12 7 8.5v2h4v-4H9z"/></svg></button>
+  <span class="sep"></span>
+  <button class="tool" id="edit-del-room" title="Delete (Delete key): the selected vertex, or the selected room if no vertex is selected"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5"/></svg></button>
+  <button class="tool" id="edit-undo" title="Undo (Ctrl/⌘+Z)"><svg viewBox="0 0 24 24"><path d="M9 6.5H5v4M5.5 10.5A7 7 0 1 1 7 17"/></svg></button>
+</div>
+  <span class="spacer"></span>
+  <div class="tb-group" id="edit-section" hidden>
+    <button class="btn primary" id="edit-start" title="Pick a floor first. The tools appear in the top bar, Table and JSON on the right">Edit floor</button>
+  </div>
+  <div class="tb-group" id="gio-group">
+    <button class="btn" id="gio-import" title="Import a GeoJSON edited in geojson.io or elsewhere (rooms with a changed shape or name are updated, shapes without an id become new rooms, missing rooms are deleted)">Import</button>
+    <button class="btn" id="gio-export" title="Export this floor's rooms as GeoJSON (it opens in geojson.io)">Export</button>
+    <input type="file" id="gio-file" accept=".geojson,.json,application/json" hidden>
+  </div>
+  <div class="tb-group" id="edit-end-group">
+    <button class="btn primary" id="edit-save" disabled>Save & apply</button>
+    <button class="btn" id="edit-cancel">Finish editing</button>
+  </div>
+  <button class="btn" id="lang-toggle" title="Switch the language"></button>
+  <button class="btn pane-toggle" id="toggle-r" title="Show / hide the room list and details">Rooms</button>
+</header>
+<aside id="flist">
+  <section class="fac">
+    <div class="fac-name"><strong id="title"></strong><span id="floor-status"></span></div>
+    <div class="sub" title="Live view: saves and rebuilds show up automatically"><span class="dot" id="live-dot"></span><span id="live-text">Static preview</span></div>
+  </section>
+  <details id="view-opts" open>
+    <summary>Display (compare with the source data)</summary>
+    <div class="opts">
+    <label class="toggle"><input type="checkbox" id="show-outline"> <span id="outline-label">Building outline</span></label>
+    <label class="toggle"><input type="checkbox" id="show-map"> Floor map from the source</label>
+    <label class="toggle"><input type="checkbox" id="show-grade"> Colour by source confidence</label>
+    <label class="slider">Room opacity<output id="rooms-val"></output>
+      <input type="range" id="rooms-opacity" min="0" max="100" step="5"></label>
+    <div class="note" id="base-note"></div>
+    <div class="note" id="tint-note">Yellow on the map = tenant areas on the official map.</div>
+    </div>
+  </details>
+  <div class="tabs" role="tablist"><button class="tab on" data-vtab="legend" role="tab">Legend</button><button class="tab" data-vtab="src" role="tab">Source</button><button class="tab" data-vtab="log" role="tab">History</button></div>
+  <div class="vpage" id="vtab-legend">
+  <section>
+    <h2>Legend</h2>
+    <div class="legend" id="legend"></div>
+    <div class="empty" style="margin-top:6px">Pale rooms = estimated (no source). "Colour by source confidence" switches to one colour per confidence level.</div>
+  </section>
+  <section>
+    <h2>Where shapes come from</h2>
+    <ul class="shape-sources" id="shape-sources"></ul>
+  </section>
+  </div>
+  <div class="vpage" id="vtab-src" hidden>
+  <section>
+    <h2>Source confidence</h2>
+    <ul class="shape-sources" id="grade-stats"></ul>
+    <div class="note" style="margin-top:8px">Weakly sourced rooms (click to select)</div>
+    <ul class="shape-sources" id="grade-list"></ul>
+  </section>
+  <section>
+    <h2>Sources</h2>
+    <ul id="sources"><li class="empty">No sources are registered.</li></ul>
+  </section>
+  </div>
+  <div class="vpage" id="vtab-log" hidden>
+  <section id="cost" hidden>
+    <h2>Cost to build (estimated)</h2>
+    <div id="cost-usd"></div>
+    <div class="note" id="cost-detail"></div>
+  </section>
+  <section>
+    <h2>Change history</h2>
+    <ul id="log"><li class="empty">No changes yet.</li></ul>
+  </section>
+  </div>
+</aside>
+<aside id="rpane">
+<div id="rview">
+  <section id="info">
+    <h2>Selected room</h2>
+    <div id="info-body" class="empty">Click a room to see its details.</div>
+  </section>
+  <div id="rooms">
+    <div class="pane-head"><strong id="fl-title">Rooms</strong><span class="note" id="fl-count"></span></div>
+    <ul id="fl-ul"></ul>
+  </div>
+</div>
+<div id="redit">
+<div id="edit">
+  <div id="edit-step"></div>
+  <div id="edit-warn" hidden></div>
+  <div class="row">
+    <button class="btn" id="edit-merge" title="Merge the rooms selected with Shift+click into one">Merge</button>
+    <button class="btn" id="edit-finish" hidden>Finish shape (Enter)</button>
+  </div>
+  <div class="row" id="edit-align" hidden>
+    <button class="btn" data-align="left" title="Align the left edge to that of the first selected room">Align left</button>
+    <button class="btn" data-align="right" title="Align the right edge to that of the first selected room">Align right</button>
+    <button class="btn" data-align="top" title="Align the top edge to that of the first selected room">Align top</button>
+    <button class="btn" data-align="bottom" title="Align the bottom edge to that of the first selected room">Align bottom</button>
+    <button class="btn" data-align="width" title="Make the width equal to the first selected room's (moves the right edge)">Match width</button>
+    <button class="btn" data-align="height" title="Make the height equal to the first selected room's (moves the top edge)">Match height</button>
+    <button class="btn" data-align="gap" title="Put facing parallel walls on one line and add vertices on the edges they touch">Close up walls</button>
+    <label title="Close up facing walls up to this distance">Gap <select id="edit-gap"><option value="1">1m</option><option value="2">2m</option><option value="3" selected>3m</option><option value="5">5m</option></select> or less</label>
+  </div>
+  <div class="row" id="edit-new">
+    <label>Name <input id="edit-new-name" placeholder="New room"></label>
+    <label>Category <button type="button" class="catbtn" id="edit-new-category"></button></label>
+  </div>
+  <label class="toggle" style="margin:0"><input type="checkbox" id="edit-ortho" checked> Snap to a right angle with the neighbouring edge</label>
+  <div id="gio-msg" class="note"></div>
+  <div id="edit-msg">Pick a tool in the top bar (select, polygon, rectangle, move / rotate / scale, delete, undo; switch to the floor map with the Rooms / Floor map switch). With Select, Shift+click several rooms to merge them, drag a vertex to move it, click an edge to add a vertex, drag an edge's "○" to move the whole edge in parallel. Vertices snap to nearby vertices, walls and right angles (hold Alt to turn this off). Editing is done in the top-down view.</div>
+</div>
+<div id="edit-map-pane"><strong>Move the floor map</strong>
+<div id="map-unsaved" class="note" hidden>Room edits are not saved. Before saving the floor map, go back to "Rooms" and press "Save & apply".</div>
+<div id="nudge" hidden>
+  <div class="note">Move the shown floor map: rotate it with the slider, move and scale it by dragging on the map (the centre of the building outline is the reference). Drag the image to move it, drag the corner and edge squares to scale (the opposite side stays fixed); Option+wheel also scales around the pointer (the wheel alone zooms the map). Only the image moves while you adjust. "Save this floor only" moves the shown floor's map and rooms; "Apply to all floors" moves every floor by the same amount.</div>
+  <label class="slider">Rotation (counter-clockwise)<output id="nudge-rot-val"></output>
+    <input type="range" id="nudge-rot" min="-10" max="10" step="0.05" value="0"></label>
+  <div class="note">Scale <output id="nudge-scale-val"></output> / East <output id="nudge-east-val"></output> / North <output id="nudge-north-val"></output></div>
+  <div class="row-btns">
+    <button class="btn primary" id="nudge-save" disabled title="Move and save only the shown floor's map, rooms and outline">Save this floor only</button>
+    <button class="btn" id="nudge-save-all" disabled title="Move and save every floor's map and rooms by the same amount">Apply to all floors</button>
+    <button class="btn" id="nudge-reset" disabled>Reset adjustment</button>
+  </div>
+</div></div>
+  <div class="tabs" role="tablist"><button class="tab" data-tab="json" role="tab">JSON</button><button class="tab on" data-tab="table" role="tab">Table</button></div>
+  <div id="tab-json" hidden><textarea id="json-text" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea><div id="json-err"></div></div>
+  <div id="tab-table"><table id="attr-table"><thead><tr><th>id</th><th>Name</th><th>Category</th><th>m²</th><th></th></tr></thead><tbody></tbody></table></div>
+</div>
+</aside>
+<div id="cat-menu" hidden></div>
+<div id="token-gate">
+  <form id="token-form">
+    <strong>Mapbox access token</strong>
+    <div class="empty">Enter a public token (pk.…). It is stored in this browser only.</div>
+    <input id="token-input" placeholder="pk.eyJ..." autocomplete="off">
+    <button type="submit">Show</button>
+  </form>
+</div>
+<script>
+const EMBEDDED = __DATA__;
+const IMAGES = __IMAGES__;          // basemap url -> data: URL
+const INJECTED_TOKEN = __TOKEN__;
+const LIVE = location.protocol.startsWith('http');
+
+// Built buildings on the preview server: pick another one to switch to it.
+async function initBuildingPicker() {
+  if (!LIVE) return;
+  const sel = document.getElementById('building-picker');
+  let list;
+  try { list = await (await fetch('/buildings')).json(); } catch { return; }
+  if (!list.items || list.items.length < 2) return;
+  const dup = n => list.items.filter(b => b.name === n).length > 1;
+  for (const b of list.items) sel.add(new Option(dup(b.name) ? `${b.name} (${b.slug})` : b.name, b.slug, false, b.slug === list.current));
+  sel.hidden = false;
+  sel.onchange = async () => {
+    const res = await fetch('/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: sel.value }) });
+    if (res.ok) location.reload(); else sel.value = list.current;
+  };
+}
+initBuildingPicker();
+const MIN_INDOOR_ZOOM = 16;      // the indoor renderer (and IndoorControl) only act from this zoom
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+// ---- i18n: the page is written in English and tl() looks an English text up in I18N.ja (placeholders: {name});
+// the language is ?lang=, else the saved choice, else English; switching saves it and reloads (see `lang-toggle`).
+const I18N = __I18N__;   // { ja: {English: 日本語}, categories: {key: {ja, en}}, names: {日本語の部屋名: English} } (templates/i18n.json)
+const LANG = (() => {
+  const v = new URLSearchParams(location.search).get('lang') || store.get('lang') || 'en';
+  return v === 'en' ? 'en' : 'ja';
+})();
+const tl = (en, vars) => {
+  const s = (LANG === 'ja' && I18N.ja[en]) || en;
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)) : s;
+};
+const JOIN = tl(', ');
+const catLabel = (c) => (I18N.categories[c] || {})[LANG] || c;
+const roomName = (n) => (LANG === 'en' && I18N.names[n]) || n;   // only the names the generator makes (共用部・通路, 未割当)
+// The static markup is Japanese: swap each text node and title / aria-label / placeholder that has an English text.
+function translateStatic() {
+  document.documentElement.lang = LANG;
+  if (LANG !== 'ja') return;
+  const key = (s) => s.replace(/\s+/g, ' ').trim();
+  const nodes = [], walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walker.nextNode());) if (!/^(SCRIPT|STYLE)$/.test(n.parentNode.nodeName)) nodes.push(n);
+  for (const n of nodes) {
+    const ja = I18N.ja[key(n.nodeValue)];
+    if (ja) { const [, pre, post] = n.nodeValue.match(/^(\s*)[\s\S]*?(\s*)$/); n.nodeValue = pre + ja + post; }
+  }
+  for (const el of document.querySelectorAll('[title], [aria-label], [placeholder]')) {
+    for (const a of ['title', 'aria-label', 'placeholder']) {
+      const ja = el.hasAttribute(a) && I18N.ja[key(el.getAttribute(a))];
+      if (ja) el.setAttribute(a, ja);
+    }
+  }
+}
+translateStatic();
+{
+  const b = document.getElementById('lang-toggle');
+  b.textContent = LANG === 'en' ? '日本語' : 'EN';
+  b.onclick = () => {
+    if (typeof edit !== 'undefined' && edit && (Object.keys(edit.shapes).length || nudgeActive(nudge.level))
+        && !confirm(tl('Discard the unsaved edits (room shapes, floor map position)?'))) return;
+    const next = LANG === 'en' ? 'ja' : 'en';
+    store.set('lang', next);
+    const u = new URL(location.href);
+    if (u.searchParams.has('lang')) u.searchParams.set('lang', next);   // ?lang= wins over the saved choice
+    location.href = u.href;   // same page when only the query is unchanged: reload
+  };
+}
+const roomLabel = (key) => roomName(roomRawName(key));
+
+let data = EMBEDDED;
+let currentFloorId = null;        // the same floor, as its feature id
+let currentLevel = null;          // floor chosen in IndoorControl; null = none (zoomed out, or floors hidden)
+let selectedId = null;
+let map;
+const TENANT_TINT = '#ffd77a';     // tenant areas on source maps, so they stand out from the floor
+const view = {
+  showMap: readPref('show-map', true),      // source floor map under the rooms
+  showOutline: readPref('show-outline', true), // footprint outline
+  rooms: readPref('rooms-opacity', 100),    // % opacity of the 3D rooms
+  grade: readPref('show-grade', false),     // colour rooms by how well sourced they are
+};
+function readPref(k, d) {
+  const raw = store.get(k);
+  if (raw === null) return d;
+  if (typeof d === 'boolean') return raw === 'true';
+  const v = Number(raw);
+  return Number.isNaN(v) ? d : v;
+}
+
+function token() { return INJECTED_TOKEN || store.get('mapbox-token'); }
+
+function start() {
+  if (!token()) {
+    document.getElementById('token-gate').style.display = 'flex';
+    document.getElementById('token-form').onsubmit = (e) => {
+      e.preventDefault();
+      const t = document.getElementById('token-input').value.trim();
+      if (!t) return;
+      store.set('mapbox-token', t);
+      document.getElementById('token-gate').style.display = 'none';
+      initMap();
+    };
+    return;
+  }
+  initMap();
+}
+
+function bbox(fc) {
+  let b = [Infinity, Infinity, -Infinity, -Infinity];
+  const walk = (c) => typeof c[0] === 'number'
+    ? (b = [Math.min(b[0], c[0]), Math.min(b[1], c[1]), Math.max(b[2], c[0]), Math.max(b[3], c[1])])
+    : c.forEach(walk);
+  fc.features.forEach(f => walk(f.geometry.coordinates));
+  return b;
+}
+
+// Selected / just-changed rooms are highlighted through the fill colour itself, not feature-state: with
+// feature-state set, switching floors (is-active-floor layers) makes GL JS throw in every frame afterwards.
+const highlight = { selected: null, changed: [] };
+// How well a room is backed by a source: its name (confidence) and its shape (geometry_source) are separate claims.
+//   traced    - named in a source and the shape comes from one (official data or a drawn floor map)
+//   listed    - named in a source, but the shape is a share of the floor (ratio)
+//   estimated - no source
+//   derived   - what is left between the other rooms (common areas)
+const GRADES = {
+  traced: { label: tl('Solid (sourced, shape sourced too)'), color: '#3a8f5c' },
+  listed: { label: tl('Name sourced only (shape estimated by ratio)'), color: '#e0a43a' },
+  estimated: { label: tl('Estimated (no source)'), color: '#d6604d' },
+  derived: { label: tl('Remaining area (common areas etc.)'), color: '#bdbdbd' },
+};
+function gradeOf(p) {
+  if (p.confidence === 'estimated') return 'estimated';
+  if (p.geometry_source === 'remainder') return 'derived';
+  if (p.geometry_source === 'ratio') return 'listed';
+  return 'traced';
+}
+const GRADE_EXPR = ['case', ['==', ['get', 'confidence'], 'estimated'], GRADES.estimated.color,
+  ['==', ['get', 'geometry_source'], 'remainder'], GRADES.derived.color,
+  ['==', ['get', 'geometry_source'], 'ratio'], GRADES.listed.color, GRADES.traced.color];
+function roomColor() {
+  return ['case',
+    ['==', ['get', 'id'], highlight.selected || ''], getCss('--sel'),
+    ['in', ['get', 'id'], ['literal', highlight.changed]], getCss('--chg'),
+    view.grade ? GRADE_EXPR : ['get', 'color']];
+}
+function updateHighlight() {
+  if (map && map.getLayer('indoor-room-fills')) map.setPaintProperty('indoor-room-fills', 'fill-color', roomColor());
+}
+function getCss(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+// Compass direction the shown floor map's top points to (null: this building has no floor map). The map is turned to
+// it when looking straight down, so the drawing reads upright instead of north-up.
+let mapUpView = false;
+function floorMapUpBearing() {
+  const bms = ((data && data.metadata) || {}).basemaps || [];
+  const bm = (currentLevel !== null && bms.find(b => b.level === currentLevel)) || bms.find(b => b.up_bearing_deg !== undefined);
+  return bm && bm.up_bearing_deg !== undefined ? bm.up_bearing_deg : null;
+}
+// The equivalent of `target` closest to `from`, so the camera turns the short way round.
+function nearestBearing(from, target) {
+  return from + (((target - from) % 360) + 540) % 360 - 180;
+}
+
+// Toggle between looking straight down and the default tilted view (restores the last tilt / bearing).
+class TopDownControl {
+  onAdd(m) {
+    this.map = m;
+    this.saved = { pitch: 58, bearing: -20 };
+    this.el = document.createElement('div');
+    this.el.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+    this.btn = document.createElement('button');
+    this.btn.type = 'button';
+    this.btn.style.cssText = 'width:auto;padding:0 8px;font-size:12px;';
+    this.btn.addEventListener('click', () => {
+      if (m.getPitch() > 0.5) {
+        this.saved = { pitch: m.getPitch(), bearing: m.getBearing() };
+        mapUpView = true;
+        const up = floorMapUpBearing();   // looking down, the floor map's top is the top of the screen
+        m.easeTo({ pitch: 0, ...(up === null ? {} : { bearing: nearestBearing(m.getBearing(), up) }), duration: 500 });
+      } else {
+        mapUpView = false;
+        m.easeTo({ pitch: this.saved.pitch, bearing: this.saved.bearing, duration: 500 });
+      }
+    });
+    this.update = () => {
+      const flat = m.getPitch() <= 0.5;
+      if (flat === this.flat) return;
+      this.flat = flat;
+      this.btn.textContent = flat ? tl('3D view') : tl('Top-down');
+      this.btn.title = flat ? tl('Back to the tilted view (default)') : tl('Show the map from directly above');
+    };
+    m.on('pitch', this.update);
+    m.on('moveend', this.update);
+    this.update();
+    this.el.appendChild(this.btn);
+    return this.el;
+  }
+  onRemove() { this.el.remove(); this.map.off('pitch', this.update);
+    this.map.off('moveend', this.update); }
+}
+
+// Mapbox indoor data model (docs.mapbox.com/help/dive-deeper/indoor-mapping): the active floor is chosen with
+// IndoorControl and every layer follows it through `is-active-floor`; the layers go in the documented order.
+const ACTIVE_FLOOR = ['is-active-floor', ['get', 'floor_id']];
+// a floor feature is its own floor: it has no floor_id
+const ACTIVE_FLOOR_SLAB = ['is-active-floor', ['get', 'id']];
+// no slab below ground (nothing to stand on, and it flickers)
+const SLAB_FILTER = ['all', ['==', ['get', 'type'], 'floor'], ACTIVE_FLOOR_SLAB, ['>', ['get', 'ground_z_offset'], 0]];
+const IS_ROOM = ['all', ['==', ['get', 'type'], 'room'], ['!=', ['get', 'class'], 'wall'], ['!=', ['get', 'shape_type'], 'poi']];
+const IS_POI = ['all', ['==', ['get', 'type'], 'room'], ['==', ['get', 'shape_type'], 'poi']];
+const IS_SHOP_POI = ['in', ['get', 'icon'], ['literal', ['shop', 'restaurant', 'cafe', 'bank', 'hospital', 'pharmacy']]];   // tenants, not facilities
+const IS_SEAT_POI = ['==', ['get', 'icon'], 'seat'];   // seats: tiny, drawn to scale (see indoor-poi-seat)
+const IS_ROW_LABEL = ['==', ['get', 'icon'], 'row-label'];   // a row's number beside the end of the row: text only
+const IS_PLAIN_POI = ['all', ['!', IS_SHOP_POI], ['!', IS_SEAT_POI], ['!', IS_ROW_LABEL]];
+const IS_WALL = ['all', ['==', ['get', 'type'], 'room'], ['==', ['get', 'class'], 'wall']];
+const EST = ['==', ['get', 'confidence'], 'estimated'];
+
+function indoorStyle() {
+  const structures = {};
+  data.features.filter(f => f.properties.type === 'structure')
+    .forEach(f => { structures[f.properties.id] = { sourceId: 'indoor' }; });
+  return {
+    version: 8,
+    imports: [{ id: 'basemap', url: 'mapbox://styles/mapbox/standard', config: { showIndoor: false } }],
+    sources: { indoor: { type: 'geojson', data, promoteId: 'id' } },
+    indoor: structures,
+    layers: [
+      { id: 'building-clip', type: 'clip', source: 'indoor', filter: ['==', ['get', 'type'], 'facility'],
+        layout: { 'clip-layer-types': ['model', 'symbol'] } },
+      { id: 'indoor-floor-slab', type: 'fill-extrusion', source: 'indoor', filter: SLAB_FILTER,
+        paint: { 'fill-extrusion-color': '#cfcfcf', 'fill-extrusion-base': ['get', 'base_height'],
+                 // the top stays under the rooms: equal heights z-fight
+                 'fill-extrusion-height': ['-', ['get', 'height'], 0.3], 'fill-extrusion-opacity': 0.9,
+                 'fill-extrusion-cast-shadows': false } },   // a floor above the ground would throw a big grey shadow over the map
+      { id: 'indoor-room-fills', type: 'fill', source: 'indoor', filter: ['all', IS_ROOM, ACTIVE_FLOOR],
+        paint: { 'fill-color': roomColor(), 'fill-opacity': 0.92, 'fill-z-offset': ['get', 'lift'] } },
+      // Hit-testing only: a flat fill raised with fill-z-offset is picked where its footprint lies on the ground,
+      // not where it is drawn. A thin invisible extrusion at the same height is picked where it is seen.
+      { id: 'indoor-room-pick', type: 'fill-extrusion', source: 'indoor', filter: ['all', IS_ROOM, ACTIVE_FLOOR],
+        paint: { 'fill-extrusion-color': '#000', 'fill-extrusion-base': ['get', 'lift'],
+                 'fill-extrusion-height': ['+', ['get', 'lift'], 0.05], 'fill-extrusion-opacity': 0, 'fill-extrusion-cast-shadows': false } },
+      { id: 'indoor-walls', type: 'fill-extrusion', source: 'indoor', filter: ['all', IS_WALL, ACTIVE_FLOOR],
+        paint: { 'fill-extrusion-color': '#9a9a9a', 'fill-extrusion-base': ['get', 'lift'],
+                 'fill-extrusion-height': ['+', ['get', 'lift'], ['get', 'wall_height']],
+                 'fill-extrusion-line-width': 0.3, 'fill-extrusion-opacity': 0.85, 'fill-extrusion-cast-shadows': false } },
+      { id: 'indoor-room-labels', type: 'symbol', source: 'indoor', filter: ['all', IS_ROOM, ACTIVE_FLOOR],
+        layout: { 'text-field': ['get', 'name'], 'text-size': 11, 'symbol-placement': 'point', 'text-allow-overlap': false,
+                  'symbol-z-elevate': true },  // labels rest on the raised slab by themselves
+        paint: { 'text-color': '#222', 'text-halo-color': '#fff', 'text-halo-width': 1.2 } },
+      // Facility icons (toilets, lifts, stairs, ...): the point rooms with shape_type poi
+      { id: 'indoor-poi', type: 'symbol', source: 'indoor', filter: ['all', IS_POI, IS_PLAIN_POI, ACTIVE_FLOOR],
+        layout: { 'icon-image': ['concat', 'poi-', ['get', 'icon']], 'icon-size': 0.5, 'icon-allow-overlap': true,
+                  'symbol-z-elevate': true } },
+      // Shop / restaurant / café / bank icons: smaller and only when zoomed in, so they do not bury the floor map
+      { id: 'indoor-poi-shop', type: 'symbol', source: 'indoor', minzoom: 18,
+        filter: ['all', IS_POI, IS_SHOP_POI, ACTIVE_FLOOR],
+        layout: { 'icon-image': ['concat', 'poi-', ['get', 'icon']], 'icon-size': 0.36, 'icon-allow-overlap': true,
+                  'symbol-z-elevate': true },
+        paint: { 'icon-opacity': 0.85 } },
+      // Seats: ~0.45 x 0.7 m, so the rectangle grows with the zoom (about the seat's real size, shrunk a little to leave a gap)
+      { id: 'indoor-poi-seat', type: 'symbol', source: 'indoor', minzoom: 19.5,
+        filter: ['all', IS_POI, IS_SEAT_POI, ACTIVE_FLOOR],
+        layout: { 'icon-image': ['case', ['==', ['get', 'fixed'], false], 'poi-seat-temp',   // not permanent: grey
+                                ['==', ['get', 'tier'], 2], 'poi-seat-2', ['==', ['get', 'tier'], 3], 'poi-seat-3', 'poi-seat'],
+                  'icon-allow-overlap': true, 'symbol-z-elevate': true,
+                  // lies on the floor and turns with the map: its depth along the seat's facing
+                  'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map', 'icon-rotate': ['get', 'facing_deg'],
+                  'icon-size': ['interpolate', ['exponential', 2], ['zoom'], 19.5, 0.25, 22, 1.4],
+                  // the seat number, upright when the stage is at the top (like the seating chart); only once it can be read
+                  'text-field': ['to-string', ['get', 'number']], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+                  'text-size': ['interpolate', ['exponential', 2], ['zoom'], 21, 8, 23, 32],
+                  'text-rotation-alignment': 'map', 'text-pitch-alignment': 'map', 'text-rotate': ['get', 'facing_deg'],
+                  'text-allow-overlap': true, 'text-ignore-placement': true },
+        paint: { 'icon-opacity': 0.95, 'text-color': ['case', ['==', ['get', 'fixed'], false], '#333', '#fff'],
+                 'text-opacity': ['step', ['zoom'], 0, 20.9, 1] } },
+      // Row numbers: points placed beside the ends of a row, upright when the stage is at the top
+      { id: 'indoor-poi-seat-row', type: 'symbol', source: 'indoor', minzoom: 19.5,
+        filter: ['all', IS_POI, IS_ROW_LABEL, ACTIVE_FLOOR],
+        layout: { 'text-field': ['to-string', ['get', 'row']], 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+                  'text-size': ['interpolate', ['exponential', 2], ['zoom'], 21, 8, 23, 32],
+                  'text-rotation-alignment': 'map', 'text-pitch-alignment': 'map', 'text-rotate': ['get', 'facing_deg'],
+                  'text-allow-overlap': true, 'text-ignore-placement': true, 'symbol-z-elevate': true },
+        paint: { 'text-color': '#333', 'text-opacity': ['step', ['zoom'], 0, 20.9, 1] } },
+      // The selected room's own POI: larger, at any zoom (filter set by select())
+      { id: 'indoor-poi-selected', type: 'symbol', source: 'indoor', filter: false,
+        layout: { 'icon-image': ['concat', 'poi-', ['get', 'icon']], 'icon-size': 0.75, 'icon-allow-overlap': true,
+                  'symbol-z-elevate': true } },
+    ],
+  };
+}
+
+// Badge icons drawn on a canvas: the imported Standard style's sprite is not reachable from our own layers.
+const CATEGORY_COLORS = __CATEGORIES__;   // the room categories the tool knows, with their colours (config.CATEGORY_COLORS)
+const CATEGORIES = Object.keys(CATEGORY_COLORS);
+const catColor = (c) => CATEGORY_COLORS[c] || '#999';
+const POI_BADGES = __POI_BADGES__;   // icon -> [label, colour]; publish.POI_BADGES, shared with the tileset viewer
+function addPoiImages() {
+  const size = 56;
+  for (const [icon, [text, color]] of Object.entries(POI_BADGES)) {
+    const name = 'poi-' + icon;
+    if (map.hasImage(name)) continue;
+    const c = document.createElement('canvas');
+    const g = c.getContext('2d');
+    if (icon.startsWith('seat')) {   // a seat is a rounded rectangle (about 0.45 x 0.7 m), not a badge; its depth runs along the facing
+      c.width = 38; c.height = 56;
+      g.fillStyle = color;
+      g.beginPath(); g.roundRect(2, 2, 34, 52, 7); g.fill();
+      g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke();
+      map.addImage(name, g.getImageData(0, 0, 38, 56), { pixelRatio: 2 });
+      continue;
+    }
+    c.width = c.height = size;
+    g.fillStyle = color;
+    g.beginPath(); g.arc(size / 2, size / 2, size / 2 - 3, 0, Math.PI * 2); g.fill();
+    g.lineWidth = 3; g.strokeStyle = '#fff'; g.stroke();
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `bold ${text.length > 2 ? 18 : 24}px sans-serif`;
+    g.fillText(text, size / 2, size / 2 + 1);
+    map.addImage(name, g.getImageData(0, 0, size, size), { pixelRatio: 2 });
+  }
+}
+
+function initMap() {
+  mapboxgl.accessToken = token();
+  const b = bbox(data);
+  map = new mapboxgl.Map({
+    container: 'map',
+    style: indoorStyle(),
+    center: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], zoom: 17,
+    antialias: true,
+  });
+  map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+  map.addControl(new TopDownControl(), 'top-right');
+  map.addControl(new mapboxgl.IndoorControl(), 'bottom-right');
+  map.on('load', addPoiImages);
+  map.on('error', (e) => {
+    if (e.error && e.error.status === 401) {
+      store.set('mapbox-token', '');
+      alert(tl('The Mapbox token is invalid. Reload the page and enter it again.'));
+    }
+  });
+  map.on('load', () => {
+    map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {
+      padding: { top: 60, bottom: 60, left: 60, right: 60 },
+      pitch: 58, bearing: -20, duration: 0,
+    });
+    // Indoor floors only exist from MIN_INDOOR_ZOOM: a large building is shown a little cropped rather than not at all.
+    if (map.getZoom() < MIN_INDOOR_ZOOM + 0.3) map.setZoom(MIN_INDOOR_ZOOM + 0.3);
+
+    const md = data.metadata || {};
+    const outlineLabel = document.getElementById('outline-label');
+    if (outlineLabel) outlineLabel.textContent = { mapbox: tl('Mapbox Building outline'), osm: tl('OSM outline'), manual: tl('Building outline (manual)') }[md.footprint_source] || tl('Building outline');
+    if (md.footprint) {
+      map.addSource('footprint', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: md.footprint } });
+      map.addLayer({ id: 'footprint-line', type: 'line', source: 'footprint',
+        paint: { 'line-color': '#2f6fde', 'line-width': 2, 'line-dasharray': [2, 1.5] } }, 'indoor-floor-slab');
+    }
+    syncBasemaps();
+    ensureEditLayers();
+
+    const hover = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+    map.on('mousemove', 'indoor-room-pick', (e) => {
+      if (edit) return;
+      map.getCanvas().style.cursor = 'pointer';
+      const p = e.features[0].properties;
+      hover.setLngLat(e.lngLat).setHTML(`<strong>${esc(p.name)}</strong><br>${esc(p.floor_name)}`).addTo(map);
+    });
+    map.on('mouseleave', 'indoor-room-pick', () => { if (!edit) map.getCanvas().style.cursor = ''; hover.remove(); });
+    map.on('mousedown', nudgeDragStart);
+    map.on('mousemove', nudgeDragMove);
+    map.on('mouseup', nudgeDragEnd);
+    // A button released outside the canvas (e.g. over the side panel's save button) never reaches the map: end the drag anyway.
+    window.addEventListener('mouseup', nudgeDragEnd);
+    window.addEventListener('blur', nudgeDragEnd);
+    map.on('wheel', nudgeWheel);
+    map.on('mousemove', (e) => {
+      if (!nudgeDrag.on || nudgeDrag.from || nudgeDrag.handle || edit) return;
+      const over = nudgeHover(e.point);
+      if (over) map.dragPan.disable(); else map.dragPan.enable();
+      map.getCanvas().style.cursor = over === 'handle' ? 'nwse-resize' : over ? 'move' : '';
+    });
+    map.on('click', (e) => {
+      if (nudgeDrag.on && nudgeHover(e.point)) return;
+      if (edit) return editMapClick(e);
+      const hits = map.queryRenderedFeatures(e.point, { layers: ['indoor-room-pick'] });
+      select(hits.length ? hits[0].properties.id : null);
+    });
+
+    renderUI();
+    bindFloorSelection();
+    applyFilters();
+    if (LIVE) { connect(); loadCost(); }
+  });
+}
+
+// The chosen floor lives in IndoorControl's model, which has no public getter. The renderer's indoor manager holds the
+// same state and fires `selector-update` on every change (experimental API). `is-active-floor` is a filter only:
+// queryRenderedFeatures does not evaluate it, so it cannot be used to read the floor back.
+function bindFloorSelection(tries = 0) {
+  const mgr = map.style && map.style.indoorManager;
+  if (!mgr) {
+    if (tries < 40) setTimeout(() => bindFloorSelection(tries + 1), 250);
+    else console.warn('indoor manager not found: floor-dependent panels will not follow IndoorControl');
+    return;
+  }
+  const follow = (state) => {
+    // IndoorControl's top button hides the floors (and zooming out does the same): the clip layer must then let the
+    // basemap's own building show again, or the footprint stays cut out with nothing drawn in it.
+    if (map.getLayer('building-clip')) {
+      map.setFilter('building-clip', state && state.activeFloorsVisible ? ['==', ['get', 'type'], 'facility'] : false);
+    }
+    // The clip layer only cuts `model` and `symbol` layers. The basemap's procedural 3D buildings (a different layer type, taller
+    // than the floor) cannot be cut, so one standing on our footprint would hide the shown floor: keep them flat while a floor is shown.
+    try { map.setConfigProperty('basemap', 'show3dBuildings', !(state && state.activeFloorsVisible)); } catch (e) { console.warn('show3dBuildings', e); }
+    const f = state && state.activeFloorsVisible && state.selectedFloorId && feature(state.selectedFloorId);
+    const level = f ? f.properties.level : null;
+    if (level === currentLevel) return;
+    // Zooming out hides the floors (level null): the edit goes on. Only switching to another floor ends it.
+    if (edit && level === null) { currentLevel = null; renderUI(); return; }
+    // Another floor while editing: with nothing unsaved the edit moves to that floor (same mode); otherwise ask, and
+    // go back to the edited floor when the answer is no.
+    let carry = null;
+    if (edit && level !== edit.level) {
+      const dirty = Object.keys(edit.shapes).length || edit.drawing || nudgeActive(nudge.level);
+      if (dirty && !confirm(tl('You have unsaved edits. Discard the edits on this floor and move to the selected floor?'))) {
+        const back = edit.floorId;
+        setTimeout(() => mgr.selectFloor(back), 0);   // the edited floor is shown again; this event is ignored (same level)
+        return;
+      }
+      carry = edit.tool;
+    }
+    currentLevel = level;
+    currentFloorId = f ? f.properties.id : null;
+    if (selectedId) select(null);   // a room of another floor is no longer on the map
+    if (carry) {
+      stopEdit(); startEdit();
+      if (carry === 'map' && edit && basemapFor(edit.level)) setTool('map');
+      log(tl('Moved the edit to floor {floor}', { floor: (levels().find(l => l.level === level) || {}).name || level }));
+    }
+    if (mapUpView && map.getPitch() <= 0.5) {
+      const up = floorMapUpBearing();
+      if (up !== null) map.easeTo({ bearing: nearestBearing(map.getBearing(), up), duration: 400 });
+    }
+    renderUI(); applyFilters();
+  };
+  mgr.on('selector-update', (e) => follow(e && e.floors ? e : mgr.getControlState()));
+  follow(mgr.getControlState());
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function levels() { return (data.metadata && data.metadata.levels) || []; }
+
+function applyFilters() {
+  if (!map || !map.getLayer('indoor-room-fills')) return;
+  const flat = ['==', ['get', 'flat'], true];
+  // is-active-floor alone is not enough: tiles built while another floor was active are not always rebuilt when the
+  // floor changes (the old floor's rooms stayed drawn). Naming the floor in the filter makes every tile rebuild.
+  const here = currentFloorId ? ['==', ['get', 'floor_id'], currentFloorId] : false;
+  const info = levels().find(l => l.level === currentLevel);
+  // With its source map shown underneath, our grey slab, walls and common areas are hidden so they do not
+  // cover the map. Rooms get no outline either: it would clutter the map's own lines.
+  const onMap = !!(info && view.showMap && basemapFor(info.level));
+  map.setFilter('indoor-floor-slab', onMap || !currentFloorId ? false : [...SLAB_FILTER, ['==', ['get', 'id'], currentFloorId]]);
+  // The floor sits at its real height; with its source map shown it goes down to the ground where the map lies.
+  map.setPaintProperty('indoor-room-fills', 'fill-z-offset', onMap ? 0 : ['get', 'lift']);
+  const rooms = onMap ? ['all', IS_ROOM, ['!', flat], ACTIVE_FLOOR, here] : ['all', IS_ROOM, ACTIVE_FLOOR, here];
+  map.setFilter('indoor-room-fills', rooms);
+  map.setFilter('indoor-room-pick', rooms);
+  const lift = onMap ? 0 : ['get', 'lift'];
+  map.setPaintProperty('indoor-room-pick', 'fill-extrusion-base', lift);
+  map.setPaintProperty('indoor-room-pick', 'fill-extrusion-height', ['+', lift, 0.05]);
+  map.setFilter('indoor-walls', onMap ? false : ['all', IS_WALL, ACTIVE_FLOOR, here]);
+  map.setFilter('indoor-room-labels', ['all', IS_ROOM, ACTIVE_FLOOR, here]);
+  map.setFilter('indoor-poi', ['all', IS_POI, IS_PLAIN_POI, ACTIVE_FLOOR, here]);
+  map.setFilter('indoor-poi-shop', ['all', IS_POI, IS_SHOP_POI, ACTIVE_FLOOR, here]);
+  map.setFilter('indoor-poi-seat', ['all', IS_POI, IS_SEAT_POI, ACTIVE_FLOOR, here]);
+  map.setFilter('indoor-poi-seat-row', ['all', IS_POI, IS_ROW_LABEL, ACTIVE_FLOOR, here]);
+  map.setPaintProperty('indoor-room-fills', 'fill-opacity', ['*', view.rooms / 100, ['case', EST, 0.68, 0.92]]);
+  map.setPaintProperty('indoor-walls', 'fill-extrusion-opacity', 0.85 * view.rooms / 100);
+  updateHighlight();   // the fill colour follows view.grade
+  updateBasemaps();
+}
+
+// ---- source data layers (floor maps from plan imports, OSM footprint)
+function basemapFor(level) { return ((data.metadata || {}).basemaps || []).find(b => b.level === level && IMAGES[b.url]); }
+
+function shownBasemapLevel() {
+  return currentLevel !== null && basemapFor(currentLevel) ? currentLevel : undefined;
+}
+
+function tintSvg(src, fills) {
+  // Recolour the source map's tenant fills (often the same grey as the floor).
+  const m = /^data:image\/svg\+xml;base64,(.*)$/.exec(src);
+  if (!m || !fills || !fills.length) return src;
+  let text = new TextDecoder().decode(Uint8Array.from(atob(m[1]), c => c.charCodeAt(0)));
+  for (const f of fills) text = text.replace(new RegExp(f.replace('#', '#'), 'gi'), TENANT_TINT);
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+}
+
+async function rasterize(src) {
+  // Mapbox image sources need a raster; draw the (SVG) map onto a canvas first.
+  const img = new Image();
+  img.src = src;
+  await img.decode();
+  const ratio = img.naturalWidth && img.naturalHeight ? img.naturalHeight / img.naturalWidth : 1;
+  const canvas = document.createElement('canvas');
+  // Longest side 2400: a tall, narrow map (an airport pier) would otherwise exceed the browser's canvas limit and come out blank.
+  canvas.width = Math.round(ratio > 1 ? 2400 / ratio : 2400); canvas.height = Math.round(ratio > 1 ? 2400 : 2400 * ratio);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/png');
+}
+
+const shownImages = {};   // level -> basemap url currently loaded as a map source
+const shownRasters = {};  // level -> the raster (data URL) that source was created with
+
+async function syncBasemaps() {
+  // Add, move or replace the floor-map image sources to match data.metadata.basemaps.
+  const list = (data.metadata || {}).basemaps || [];
+  if (LIVE && list.some(bm => !IMAGES[bm.url] || (bm.source_url && !IMAGES[bm.source_url]))) {
+    // A basemap added since the page was built: its image is only in images.json.
+    try { Object.assign(IMAGES, await (await fetch(`images.json?t=${Date.now()}`)).json()); } catch {}
+  }
+  for (const level of Object.keys(shownImages).map(Number)) {
+    const bm = list.find(b => b.level === level);
+    if (bm && bm.url === shownImages[level]) continue;
+    map.removeLayer(`basemap-${level}`); map.removeSource(`basemap-${level}`);
+    delete shownImages[level];
+  }
+  for (const bm of list) {
+    if (!IMAGES[bm.url]) continue;
+    const id = `basemap-${bm.level}`;
+    if (shownImages[bm.level]) {
+      map.getSource(id).setCoordinates(nudgeActive(bm.level) ? nudgeCorners(bm.corners) : bm.corners);
+      continue;
+    }
+    try {
+      const url = await rasterize(tintSvg(IMAGES[bm.url], bm.tenant_fills));
+      if (shownImages[bm.level]) continue;   // added by an overlapping call
+      map.addSource(id, { type: 'image', url, coordinates: bm.corners });
+      map.addLayer({ id, type: 'raster', source: id, layout: { visibility: 'none' },
+                     paint: { 'raster-opacity': 0, 'raster-fade-duration': 0 } },
+                   map.getLayer('footprint-line') ? 'footprint-line' : 'indoor-floor-slab');
+      shownImages[bm.level] = bm.url;
+      shownRasters[bm.level] = url;
+    } catch (e) { console.warn('basemap', bm.level, e); }
+  }
+  applyFilters();
+}
+
+function updateBasemaps() {
+  if (!map || !map.getStyle()) return;
+  const shown = shownBasemapLevel();
+  for (const bm of (data.metadata || {}).basemaps || []) {
+    const id = `basemap-${bm.level}`;
+    if (!map.getLayer(id)) continue;
+    map.setLayoutProperty(id, 'visibility', bm.level === shown && view.showMap ? 'visible' : 'none');
+    map.setPaintProperty(id, 'raster-opacity', 1);
+  }
+  syncNudgeUI();
+  if (map.getLayer('footprint-line')) map.setLayoutProperty('footprint-line', 'visibility', view.showOutline ? 'visible' : 'none');
+  const lv = levels().find(l => l.level === shown);
+  const hasAny = ((data.metadata || {}).basemaps || []).some(b => IMAGES[b.url]);
+  document.getElementById('show-map').disabled = !hasAny;
+  document.getElementById('tint-note').style.display = view.showMap && shown !== undefined ? '' : 'none';
+  document.getElementById('base-note').textContent = !hasAny
+    ? tl('This building has no aligned floor map.')
+    : !view.showMap ? ''
+    : shown !== undefined ? tl('Floor map shown: {name}', { name: lv ? lv.name : shown })
+    : currentLevel === null ? tl('Pick a floor to see its floor map.') : tl('(no map for this floor)');
+}
+
+// ---- footprint centre (the nudge rotates and scales about it)
+function centroidOf(geom) {
+  const b = bbox({ features: [{ geometry: geom }] });
+  return [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+}
+
+function footprintCentroid() {
+  // The footprint's area centroid (what `main.py nudge-map` rotates and scales about), not its bounding-box centre.
+  const g = data.metadata.footprint;
+  const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates];
+  let A = 0, X = 0, Y = 0;
+  for (const poly of polys) poly.forEach((ring, k) => {
+    let a = 0, x = 0, y = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+      const [x0, y0] = ring[i], [x1, y1] = ring[i + 1], w = x0 * y1 - x1 * y0;
+      a += w; x += (x0 + x1) * w; y += (y0 + y1) * w;
+    }
+    if (!a) return;
+    const w = Math.abs(a) / 2 * (k === 0 ? 1 : -1);   // holes subtract
+    A += w; X += x / (3 * a) * w; Y += y / (3 * a) * w;
+  });
+  return A ? [X / A, Y / A] : centroidOf(g);
+}
+
+// ---- floor-map nudge: rotate / scale / shift the shown floor map by hand, then save it for the whole building
+const nudge = { level: null, rot: 0, scale: 0, east: 0, north: 0 };   // rot in degrees, scale in percent, shifts in metres
+
+function nudgeActive(level) {
+  return nudge.level === level && (nudge.rot || nudge.scale || nudge.east || nudge.north);
+}
+
+function nudgeCorners(corners) {
+  // Same transform as `main.py nudge-map`: rotate (counter-clockwise) and scale about the footprint's centre, then shift.
+  const [lon0, lat0] = footprintCentroid();
+  const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
+  const th = nudge.rot * Math.PI / 180, s = 1 + nudge.scale / 100, c = Math.cos(th), sn = Math.sin(th);
+  return corners.map(([lon, lat]) => {
+    const x = (lon - lon0) * kx, y = (lat - lat0) * ky;
+    return [lon0 + (s * (x * c - y * sn) + nudge.east) / kx, lat0 + (s * (x * sn + y * c) + nudge.north) / ky];
+  });
+}
+
+function showNudge() {
+  const bm = nudge.level !== null && basemapFor(nudge.level);
+  const src = bm && map.getSource(`basemap-${nudge.level}`);
+  if (src) src.setCoordinates(nudgeActive(nudge.level) ? nudgeCorners(bm.corners) : bm.corners);
+  const fmt = { rot: v => `${v.toFixed(2)}°`, scale: v => `${v.toFixed(1)}%`, east: v => `${v.toFixed(1)} m`, north: v => `${v.toFixed(1)} m` };
+  for (const k of Object.keys(fmt)) {
+    if (k === 'rot') document.getElementById('nudge-rot').value = nudge.rot;
+    document.getElementById(`nudge-${k}-val`).textContent = fmt[k](nudge[k]);
+  }
+  if (map.isStyleLoaded() || map.getSource('nudge-handles')) updateNudgeHandles();
+  const dirty = !!nudgeActive(nudge.level);
+  document.getElementById('nudge-save').disabled = !dirty;
+  document.getElementById('nudge-save-all').disabled = !dirty;
+  document.getElementById('nudge-reset').disabled = !dirty;
+}
+
+// "ドラッグで移動": while on, dragging the map moves the floor map (east / north) instead of the camera.
+const nudgeDrag = { on: false, from: null, base: null, handle: null };
+
+function setNudgeDrag(on) {
+  nudgeDrag.on = on && !!edit && edit.tool === 'map';
+  nudgeDrag.from = null; nudgeDrag.handle = null;
+  if (nudgeDrag.on || map.getSource('nudge-handles')) updateNudgeHandles();
+  // The camera is only frozen while the pointer is over the floor map (see nudgeHover); elsewhere the map pans as usual.
+  map.dragPan.enable(); map.scrollZoom.enable();
+  if (!edit) map.getCanvas().style.cursor = '';
+}
+
+function nudgeFrame() {
+  const [lon0, lat0] = footprintCentroid();
+  return { lon0, lat0, kx: 111320 * Math.cos(lat0 * Math.PI / 180), ky: 110574 };
+}
+
+function nudgeHandlePoints() {
+  // The shown floor map's four corners and four edge midpoints (0-3 corners, 4-7 the edge after corner i-4).
+  const bm = basemapFor(nudge.level);
+  if (!bm) return [];
+  const c = nudgeCorners(bm.corners);
+  return [...c, ...c.map((p, i) => { const q = c[(i + 1) % 4]; return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; })];
+}
+
+function updateNudgeHandles() {
+  const pts = nudgeDrag.on ? nudgeHandlePoints() : [];
+  const fc = { type: 'FeatureCollection', features: pts.length ? [
+    { type: 'Feature', properties: { kind: 'frame' }, geometry: { type: 'LineString', coordinates: [...pts.slice(0, 4), pts[0]] } },
+    ...pts.map((c, i) => ({ type: 'Feature', properties: { kind: 'handle', idx: i }, geometry: { type: 'Point', coordinates: c } })),
+  ] : [] };
+  if (!map.getSource('nudge-handles')) {
+    map.addSource('nudge-handles', { type: 'geojson', data: fc });
+    map.addLayer({ id: 'nudge-frame', type: 'line', source: 'nudge-handles', filter: ['==', ['get', 'kind'], 'frame'],
+      paint: { 'line-color': '#2f6fde', 'line-width': 2 } });
+    map.addLayer({ id: 'nudge-handles', type: 'circle', source: 'nudge-handles', filter: ['==', ['get', 'kind'], 'handle'],
+      paint: { 'circle-radius': 7, 'circle-color': '#fff', 'circle-stroke-color': '#2f6fde', 'circle-stroke-width': 2 } });
+  } else map.getSource('nudge-handles').setData(fc);
+}
+
+function nudgeHover(point) {
+  // 'handle' over a scale handle, 'inside' over the floor map, null elsewhere.
+  if (map.getLayer('nudge-handles') && map.queryRenderedFeatures(point, { layers: ['nudge-handles'] }).length) return 'handle';
+  const q = nudgeHandlePoints().slice(0, 4).map(c => { const p = map.project(c); return [p.x, p.y]; });
+  if (q.length < 4) return null;
+  let inside = false;
+  for (let i = 0, j = 3; i < 4; j = i++) {
+    if ((q[i][1] > point.y) !== (q[j][1] > point.y) &&
+        point.x < (q[j][0] - q[i][0]) * (point.y - q[i][1]) / (q[j][1] - q[i][1]) + q[i][0]) inside = !inside;
+  }
+  return inside ? 'inside' : null;
+}
+
+function nudgeDragStart(e) {
+  if (!nudgeDrag.on || !nudgeHover(e.point)) return;
+  e.preventDefault();
+  nudgeDrag.base = { east: nudge.east, north: nudge.north, scale: nudge.scale };
+  const hit = map.getLayer('nudge-handles') ? map.queryRenderedFeatures(e.point, { layers: ['nudge-handles'] }) : [];
+  if (hit.length) {
+    // Scale by a handle: the opposite handle stays where it is.
+    const { lon0, lat0, kx, ky } = nudgeFrame(), pts = nudgeHandlePoints(), i = hit[0].properties.idx;
+    const m = ([lo, la]) => [(lo - lon0) * kx, (la - lat0) * ky];
+    const j = i < 4 ? (i + 2) % 4 : 4 + (i - 4 + 2) % 4;
+    nudgeDrag.handle = { anchor: m(pts[j]), grab: m(pts[i]) };
+    return;
+  }
+  nudgeDrag.from = e.lngLat;
+}
+
+function nudgeScaleBy(f) {
+  // Scale the shown map by f about the anchor: s' = f s, t' = f t + (1 - f) anchor.
+  const b = nudgeDrag.base, a = nudgeDrag.handle.anchor, s = 1 + b.scale / 100;
+  f = Math.max(0.2, Math.min(5, s * f)) / s;
+  nudge.scale = (s * f - 1) * 100;
+  nudge.east = Math.max(-1000, Math.min(1000, f * b.east + (1 - f) * a[0]));
+  nudge.north = Math.max(-1000, Math.min(1000, f * b.north + (1 - f) * a[1]));
+  showNudge();
+}
+
+function nudgeDragMove(e) {
+  if (nudgeDrag.on && nudgeDrag.handle) {
+    const { lon0, lat0, kx, ky } = nudgeFrame(), { anchor: a, grab: g } = nudgeDrag.handle;
+    const dx = g[0] - a[0], dy = g[1] - a[1];
+    const px = (e.lngLat.lng - lon0) * kx - a[0], py = (e.lngLat.lat - lat0) * ky - a[1];
+    return nudgeScaleBy(Math.max(0.05, (px * dx + py * dy) / (dx * dx + dy * dy)));
+  }
+  if (!nudgeDrag.on || !nudgeDrag.from) return;
+  const lat0 = footprintCentroid()[1];
+  const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
+  const clamp = v => Math.max(-1000, Math.min(1000, v));   // the server's limit
+  nudge.east = clamp(nudgeDrag.base.east + (e.lngLat.lng - nudgeDrag.from.lng) * kx);
+  nudge.north = clamp(nudgeDrag.base.north + (e.lngLat.lat - nudgeDrag.from.lat) * ky);
+  showNudge();
+}
+
+function nudgeWheel(e) {
+  // The wheel zooms the camera as usual; with ⌥ held it scales the floor map about the pointer instead.
+  if (!nudgeDrag.on || !e.originalEvent.altKey) return;
+  const r = map.getCanvas().getBoundingClientRect();   // a wheel event carries no point / lngLat of its own
+  const pt = new mapboxgl.Point(e.originalEvent.clientX - r.left, e.originalEvent.clientY - r.top);   // like a mouse event's e.point
+  if (!nudgeHover(pt)) return;
+  const ll = map.unproject(pt);
+  e.preventDefault();
+  const [lon0, lat0] = footprintCentroid();
+  const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
+  const s = 1 + nudge.scale / 100;
+  const f = Math.max(0.2, Math.min(5, s * Math.exp(-e.originalEvent.deltaY * (e.originalEvent.ctrlKey ? 0.01 : 0.002)))) / s;
+  const qx = (ll.lng - lon0) * kx, qy = (ll.lat - lat0) * ky;   // pointer, metres from the footprint's centre
+  nudge.scale = (s * f - 1) * 100;
+  nudge.east = Math.max(-1000, Math.min(1000, f * nudge.east + (1 - f) * qx));
+  nudge.north = Math.max(-1000, Math.min(1000, f * nudge.north + (1 - f) * qy));
+  showNudge();
+}
+
+function nudgeDragEnd() { nudgeDrag.from = null; nudgeDrag.handle = null; }
+
+function resetNudge() {
+  Object.assign(nudge, { rot: 0, scale: 0, east: 0, north: 0 });
+  showNudge();
+}
+
+function syncNudgeUI() {
+  // Shown for the chosen floor's map; another floor starts from its saved position again.
+  const el = document.getElementById('nudge');
+  const here = LIVE && currentLevel !== null && !!basemapFor(currentLevel) && !!data.metadata.footprint;
+  el.hidden = !here || !view.showMap;
+  if (el.hidden && nudgeDrag.on) setNudgeDrag(false);
+  if (nudge.level !== currentLevel) {
+    if (nudge.level !== null && nudgeActive(nudge.level)) resetNudge();
+    nudge.level = currentLevel;
+    if (nudgeDrag.on) setNudgeDrag(false);
+    if (here) showNudge();
+  }
+}
+
+async function saveNudge(all) {
+  const body = { rotate_deg: nudge.rot, scale: 1 + nudge.scale / 100, east_m: nudge.east, north_m: nudge.north };
+  if (!all) body.level = nudge.level;
+  if (edit && Object.keys(edit.shapes).length) { alert(tl('There are unsaved room edits. Save them with "Save & apply" or discard them first, then save the floor map (the rooms move with it).')); return; }
+  if (!confirm(tl('Move and save the rooms and floor map of {scope} by rotation {rot}° / scale {scale}% / east {east} m / north {north} m?', {
+    scope: all ? tl('All floors') : tl('Floor {level} only', { level: nudge.level }),
+    rot: nudge.rot.toFixed(2), scale: nudge.scale.toFixed(1), east: nudge.east.toFixed(1), north: nudge.north.toFixed(1) }))) return;
+  // Saving while 「ドラッグ移動」 is on is fine: end it first so a half-finished drag cannot move the map again during / after the save.
+  if (nudgeDrag.on) setNudgeDrag(false);
+  nudgeDragEnd();
+  const btns = ['nudge-save', 'nudge-save-all', 'nudge-reset'].map(id => document.getElementById(id));
+  btns.forEach(b => { b.disabled = true; });
+  let report;
+  try {
+    const res = await fetch('/nudge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    report = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
+  } catch (e) { report = { ok: false, error: e.message }; }
+  if (!report.ok) { showNudge(); alert(tl('Could not save: {error}', { error: report.error || tl('unknown error') })); return; }
+  // Take the rebuilt data in first, then drop the hand adjustment: resetting earlier would draw the old corners, and a live
+  // update arriving while the adjustment is still on would apply it a second time on top of the already moved corners.
+  Object.assign(nudge, { rot: 0, scale: 0, east: 0, north: 0 });
+  try { await reload(); } catch (e) { console.warn('reload after nudge', e); }
+  showNudge();
+  log(tl('Saved a fine adjustment of the floor map and room positions (tell Claude "undo" to revert)'));
+}
+
+function bindNudge() {
+  document.getElementById('nudge-rot').oninput = (e) => { nudge.rot = parseFloat(e.target.value) || 0; showNudge(); };
+  document.getElementById('nudge-reset').onclick = resetNudge;
+  document.getElementById('nudge-save').onclick = () => saveNudge(false);
+  document.getElementById('nudge-save-all').onclick = () => saveNudge(true);
+}
+
+function bindControls() {
+  for (const [key, id] of [['showMap', 'show-map'], ['showOutline', 'show-outline'], ['grade', 'show-grade']]) {
+    const box = document.getElementById(id);
+    box.checked = view[key];
+    box.onchange = () => { view[key] = box.checked; store.set(id, String(box.checked)); applyFilters(); };
+  }
+  const input = document.getElementById('rooms-opacity'), out = document.getElementById('rooms-val');
+  input.value = view.rooms;
+  out.textContent = `${view.rooms}%`;
+  input.oninput = () => {
+    view.rooms = Number(input.value);
+    out.textContent = `${view.rooms}%`;
+    store.set('rooms-opacity', String(view.rooms));
+    applyFilters();
+  };
+}
+
+function renderUI() {
+  document.getElementById('title').textContent = (data.metadata && data.metadata.building) || 'Indoor map';
+  document.title = `${document.getElementById('title').textContent} Indoor`;
+  const cur = levels().find(l => l.level === currentLevel);
+  document.getElementById('floor-status').textContent = cur ? cur.name : '–';
+
+  const cats = {};
+  data.features.filter(isRoomFeature)
+    .forEach(f => { cats[f.properties.category] = cats[f.properties.category] || f.properties.color; });
+  document.getElementById('legend').innerHTML = Object.entries(cats)
+    .map(([c, col]) => `<div><span class="sw" style="background:${esc(col)}"></span>${esc(catLabel(c))}</div>`).join('');
+  document.getElementById('edit-section').hidden = !LIVE || currentLevel === null;
+  if (!edit) renderViewList();
+  renderSources();
+  renderShapeSources();
+  renderGradeStats();
+  renderInfo();
+}
+
+function sources() { return ((data.metadata && data.metadata.provenance) || {}).sources || []; }
+
+function host(url) { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } }
+
+function renderSources() {
+  const list = sources();
+  document.getElementById('sources').innerHTML = list.length
+    ? list.map(s => `<li><span class="sid">${esc(s.id)}</span><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(host(s.url))}</a>`
+        + (s.note ? `<span class="note">${esc(s.note)}</span>` : '') + '</li>').join('')
+    : `<li class="empty">${tl('No sources are registered.')}</li>`;
+}
+
+function isRoomFeature(f) { return f.properties.type === 'room' && f.properties.class !== 'wall' && f.properties.shape_type !== 'poi'; }
+function feature(id) { return data.features.find(f => f.properties.id === id); }
+
+// Where a room's shape came from (geometry_source) and how it was put on the map (georef);
+// see GEOMETRY_SOURCES / GEOREF_METHODS in indoor_gen/config.py.
+const SHAPE_LABELS = {
+  vector: tl('Official data (vector)'), imagemap: tl('Official hotspots'), traced: tl('Traced from an image (Claude)'),
+  drawn: tl('Drawn by Claude (no drawing)'), manual: tl('Edited by hand'), ratio: tl('Estimated (split by ratio)'), remainder: tl('Remaining area (common areas etc.)'),
+};
+const GEOREF_LABELS = {
+  outline_fit: tl('Drawing outline fitted to the building outline'), point_pairs: tl('Aligned with point pairs'),
+  direct: tl('Coordinates written directly'), footprint: tl('Derived from the OSM outline'),
+};
+const MODE_LABELS = { similarity: tl('Similarity'), affine: tl('Affine'), piecewise: tl('Piecewise') };
+
+function georefText(p) {
+  const t = GEOREF_LABELS[p.georef] || p.georef || '–';
+  if (p.georef !== 'point_pairs') return t;
+  const extra = [MODE_LABELS[p.georef_mode] || p.georef_mode,
+                 p.georef_rms_m != null ? tl('error {m} m', { m: (+p.georef_rms_m).toFixed(1) }) : null].filter(Boolean);
+  return extra.length ? tl('{text} ({extra})', { text: t, extra: extra.join(JOIN) }) : t;
+}
+
+function renderShapeSources() {
+  // Area by shape origin on the selected floor (or the whole building), largest first.
+  const rooms = data.features.filter(f => isRoomFeature(f)
+    && (currentLevel === null || f.properties.level === currentLevel));
+  const by = {};
+  for (const f of rooms) {
+    const p = f.properties, k = p.geometry_source || 'ratio';
+    by[k] = by[k] || { area: 0, n: 0, georef: new Set() };
+    by[k].area += p.area_m2 || 0; by[k].n += 1; by[k].georef.add(georefText(p));
+  }
+  const total = Object.values(by).reduce((s, v) => s + v.area, 0) || 1;
+  const el = document.getElementById('shape-sources');
+  el.innerHTML = Object.entries(by).sort((a, b) => b[1].area - a[1].area).map(([k, v]) =>
+    `<li><span>${esc(SHAPE_LABELS[k] || k)}<br><span class="sub">${[...v.georef].map(esc).join(' / ')}</span></span>`
+    + `<span>${tl('{pct}% · {n} rooms', { pct: Math.round(v.area / total * 100), n: v.n })}</span></li>`).join('')
+    || `<li class="empty">${tl('No rooms.')}</li>`;
+}
+
+function renderGradeStats() {
+  // Share of area and room count per grade on the selected floor (or the whole building).
+  const rooms = data.features.filter(f => isRoomFeature(f)
+    && (currentLevel === null || f.properties.level === currentLevel));
+  const by = {};
+  for (const f of rooms) {
+    const g = gradeOf(f.properties);
+    by[g] = by[g] || { area: 0, n: 0 };
+    by[g].area += f.properties.area_m2 || 0; by[g].n += 1;
+  }
+  const total = Object.values(by).reduce((s, v) => s + v.area, 0) || 1;
+  document.getElementById('grade-stats').innerHTML = Object.keys(GRADES).filter(g => by[g]).map(g =>
+    `<li><span><span class="sw" style="display:inline-block;background:${GRADES[g].color};margin-right:6px"></span>${esc(GRADES[g].label)}</span>`
+    + `<span>${tl('{pct}% · {n} rooms', { pct: Math.round(by[g].area / total * 100), n: by[g].n })}</span></li>`).join('')
+    || `<li class="empty">${tl('No rooms.')}</li>`;
+  const weak = rooms.filter(f => ['estimated', 'listed'].includes(gradeOf(f.properties)))
+    .sort((a, b) => (b.properties.area_m2 || 0) - (a.properties.area_m2 || 0));
+  const el = document.getElementById('grade-list');
+  el.innerHTML = weak.slice(0, 12).map(f =>
+    `<li><a href="#" data-room="${esc(f.properties.id)}">${esc(roomName(f.properties.name))}</a>`
+    + `<span>${f.properties.area_m2} m²</span></li>`).join('')
+    + (weak.length > 12 ? `<li class="empty">${tl('and {n} more', { n: weak.length - 12 })}</li>` : '')
+    || `<li class="empty">${tl('Every room is backed by a source.')}</li>`;
+  el.querySelectorAll('a[data-room]').forEach(a => {
+    a.onclick = (e) => { e.preventDefault(); select(a.dataset.room); };
+  });
+}
+
+// The room's own POI icons (a shop's category icon, a facility room's pictogram), drawn like the map badges.
+function poiBadges(p) {
+  return data.features.filter(f => f.properties.shape_type === 'poi' && f.properties.room_id === p.room_id
+                                   && f.properties.floor_id === p.floor_id)
+    .map(f => f.properties.icon).filter(icon => POI_BADGES[icon])
+    .map(icon => `<span class="poi-badge"><i style="background:${esc(POI_BADGES[icon][1])}">${esc(POI_BADGES[icon][0])}</i>${esc(icon)}</span>`)
+    .join('');
+}
+
+function renderInfo() {
+  const el = document.getElementById('info-body');
+  const f = selectedId && feature(selectedId);
+  if (!f) { el.className = 'empty'; el.textContent = tl('Click a room to see its details.'); return; }
+  const p = f.properties;
+  const src = sources().find(s => s.id === p.source);
+  el.className = '';
+  el.innerHTML = `<dl>
+    <dt>${tl('Name')}</dt><dd><strong>${esc(roomName(p.name))}</strong></dd>
+    <dt>ID</dt><dd><code>${esc(p.id)}</code></dd>
+    <dt>${tl('Floor')}</dt><dd>${esc(p.floor_name)}</dd>
+    <dt>${tl('Category')}</dt><dd>${esc(catLabel(p.category))}${poiBadges(p)}</dd>
+    <dt>${tl('Area')}</dt><dd>${tl('{area} m² ({pct}%)', { area: p.area_m2, pct: (p.ratio * 100).toFixed(1) })}</dd>
+    <dt>${tl('Confidence')}</dt><dd>${esc(GRADES[gradeOf(p)].label)}</dd>
+    <dt>${tl('Shape')}</dt><dd>${esc(SHAPE_LABELS[p.geometry_source] || p.geometry_source || '–')}</dd>
+    <dt>${tl('Placement')}</dt><dd>${esc(georefText(p))}</dd>
+    ${src ? `<dt>${tl('Source')}</dt><dd><a href="${esc(src.url)}" target="_blank" rel="noopener">${esc(src.note || src.url)}</a></dd>` : ''}
+  </dl>
+  ${LIVE ? `<div class="hint">${tl('Tell Claude "this room …" and it edits this room.')}</div>` : ''}`;
+}
+
+function select(id) {
+  selectedId = id;
+  highlight.selected = id;
+  updateHighlight();
+  const sel = id && feature(id);
+  if (map && map.getLayer('indoor-poi-selected')) {
+    map.setFilter('indoor-poi-selected', sel ? ['all', IS_POI, ['==', ['get', 'room_id'], sel.properties.room_id],
+                                                ['==', ['get', 'floor_id'], sel.properties.floor_id], ACTIVE_FLOOR] : false);
+  }
+  renderInfo();
+  if (!edit) renderViewList();
+  if (!LIVE) return;
+  const f = id && feature(id);
+  const body = f ? { id: f.properties.room_id || id, name: f.properties.name, level: f.properties.level, floor_name: f.properties.floor_name,
+                     category: f.properties.category, selected_at: new Date().toISOString() } : null;
+  fetch('/selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .catch(() => {});
+}
+
+// ---- hand-editing room shapes: vertices are dragged / added / deleted on the map; rooms deleted / added;
+// "保存して反映" sends the operations to the server (`main.py edit-rooms`), which writes them into the floor's plan.
+let edit = null;   // { level, shapes: {key: {state, geometry, name?, category?, color?}}, sel, vsel: {key,p,r,i}|null, drawing: [lngLat]|null, undo: [], drag }
+const EDIT_COLORS = { mod: '#2f6fde', new: '#2a9d5c', del: '#d33' };
+const EDIT_SOURCES = ['edit-shapes', 'edit-vertices', 'edit-mids', 'edit-draw', 'edit-hint', 'edit-overlap', 'edit-xform'];
+const emptyFC = () => ({ type: 'FeatureCollection', features: [] });
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const polysOf = (g) => g.type === 'Polygon' ? [g.coordinates] : g.coordinates;   // references into g
+
+function roomKey(f) { return f.properties.room_id; }
+function floorRooms() { return data.features.filter(f => isRoomFeature(f) && f.properties.level === edit.level); }
+function editableReason(f) {
+  const p = f.properties;
+  if (p.geometry_source === 'remainder') return tl('Common areas / unassigned space follow the edits of the other rooms automatically.');
+  if (/-\d+$/.test(p.room_id || '') && p.name && /\s\d+$/.test(p.name)) return tl('Rooms split by the config must be edited in the config.');
+  return null;
+}
+function workingGeometry(key) {
+  if (edit.shapes[key]) return edit.shapes[key].geometry;
+  const f = floorRooms().find(r => roomKey(r) === key);
+  return f ? f.geometry : null;
+}
+
+function startEdit() {
+  if (edit || currentLevel === null) return;
+  edit = { level: currentLevel, floorId: currentFloorId, shapes: {}, sel: null, vsel: null, drawing: null, undo: [], drag: null, nextNew: 1, multi: [], tool: 'select', rect: null, preview: null };
+  document.body.classList.add('aligning', 'editing');   // 'aligning' hides the side panel on narrow screens
+  const lv = levels().find(l => l.level === edit.level);
+  // every category the tool knows, then the ones used anywhere in the building (own ones such as hospital): not only this floor's
+  const cats = [...new Set([...CATEGORIES, ...data.features.filter(isRoomFeature).map(f => f.properties.category)])].filter(Boolean);
+  edit.cats = cats;
+  document.getElementById('edit').classList.add('open');
+  requestAnimationFrame(() => map.resize());   // the panes take their place beside the map
+  map.boxZoom.disable();   // Shift+click selects several rooms; Shift+drag would zoom to a box instead
+  loadClipper().catch(() => {});   // for 結合, loaded ahead so it is ready when needed
+  if (map.getPitch() > 0.5) map.easeTo({ pitch: 0, duration: 500 });
+  if (selectedId) { const f = feature(selectedId); edit.sel = f ? roomKey(f) : null; }
+  map.getCanvas().style.cursor = '';
+  renderEdit();
+}
+
+function stopEdit() {
+  if (!edit) return;
+  if (edit.tool === 'map') setNudgeDrag(false);
+  edit = null;
+  document.body.classList.remove('aligning', 'editing', 'map-tool');
+  requestAnimationFrame(() => map.resize());
+  document.getElementById('edit').classList.remove('open');
+  document.getElementById('edit-map-pane').classList.remove('open');
+  if (nudgeActive(nudge.level)) resetNudge();   // an unsaved floor-map adjustment is dropped with the edit mode
+  map.doubleClickZoom.enable(); map.dragPan.enable(); map.boxZoom.enable();
+  map.getCanvas().style.cursor = '';
+  for (const id of EDIT_SOURCES) if (map.getSource(id)) map.getSource(id).setData(emptyFC());
+  renderViewList();
+}
+
+function ensureEditLayers() {
+  if (map.getSource('edit-shapes')) return;
+  for (const id of EDIT_SOURCES) map.addSource(id, { type: 'geojson', data: emptyFC() });
+  const col = ['match', ['get', 'state'], 'new', EDIT_COLORS.new, 'del', EDIT_COLORS.del, 'multi', '#e08a00', EDIT_COLORS.mod];
+  map.addLayer({ id: 'edit-fill', type: 'fill', source: 'edit-shapes', paint: { 'fill-color': col, 'fill-opacity': ['match', ['get', 'state'], 'del', 0.45, 'sel', 0, 0.35] } });
+  map.addLayer({ id: 'edit-line', type: 'line', source: 'edit-shapes',
+    paint: { 'line-color': ['case', ['==', ['get', 'ref'], 1], '#6a1b9a', ['==', ['get', 'multi'], 1], '#e08a00', col], 'line-width': ['case', ['==', ['get', 'sel'], 1], 3, ['==', ['get', 'multi'], 1], 3, ['==', ['get', 'state'], 'new'], 3, 1.5] } });
+  map.addLayer({ id: 'edit-label', type: 'symbol', source: 'edit-shapes', filter: ['!=', ['get', 'state'], 'sel'],
+    layout: { 'text-field': ['get', 'label'], 'text-size': 13, 'text-anchor': 'top', 'text-offset': [0, 1.2], 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-allow-overlap': true },
+    paint: { 'text-color': '#14301f', 'text-halo-color': '#fff', 'text-halo-width': 2 } });
+  map.addLayer({ id: 'edit-draw-line', type: 'line', source: 'edit-draw', paint: { 'line-color': EDIT_COLORS.new, 'line-width': 2, 'line-dasharray': [2, 1] } });
+  map.addLayer({ id: 'edit-mid', type: 'circle', source: 'edit-mids',
+    paint: { 'circle-radius': 4, 'circle-color': '#fff', 'circle-stroke-color': EDIT_COLORS.mod, 'circle-stroke-width': 1.5, 'circle-opacity': 0.8 } });
+  map.addLayer({ id: 'edit-vertex', type: 'circle', source: 'edit-vertices',
+    paint: { 'circle-radius': ['case', ['==', ['get', 'sel'], 1], 8, 6], 'circle-color': ['case', ['==', ['get', 'sel'], 1], '#ffb300', '#fff'],
+             'circle-stroke-color': EDIT_COLORS.mod, 'circle-stroke-width': 2 } });
+  map.on('mousemove', (e) => {   // show where the next point would snap while drawing
+    if (!edit || !edit.drawing || edit.drawing.length < 2) return;
+    if (e.originalEvent.altKey) edit.guide = null; else snapTo(e.point, e.lngLat, null, drawAnchors(edit.drawing));
+    renderEdit();
+  });
+  map.addLayer({ id: 'edit-overlap-line', type: 'line', source: 'edit-overlap',
+    paint: { 'line-color': '#e5202b', 'line-width': 5, 'line-opacity': 0.9 } });
+  map.addLayer({ id: 'edit-hint', type: 'circle', source: 'edit-hint',
+    paint: { 'circle-radius': 5, 'circle-color': EDIT_COLORS.new, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+  map.addLayer({ id: 'edit-xform-frame', type: 'line', source: 'edit-xform', filter: ['==', ['get', 'kind'], 'frame'],
+    paint: { 'line-color': '#e08a00', 'line-width': 1.5, 'line-dasharray': [3, 2] } });
+  map.addLayer({ id: 'edit-xform-stem', type: 'line', source: 'edit-xform', filter: ['==', ['get', 'kind'], 'stem'],
+    paint: { 'line-color': '#e08a00', 'line-width': 1.5 } });
+  map.addLayer({ id: 'edit-xform-handle', type: 'circle', source: 'edit-xform', filter: ['in', ['get', 'kind'], ['literal', ['corner', 'rotate']]],
+    paint: { 'circle-radius': 6, 'circle-color': ['case', ['==', ['get', 'kind'], 'rotate'], '#2a9d5c', '#fff'],
+             'circle-stroke-color': '#e08a00', 'circle-stroke-width': 2 } });
+  map.on('mousedown', xformDown);
+  map.on('mousedown', rectDown);
+  map.on('mousemove', rectMove);
+  map.on('mouseup', rectUp);
+  map.on('zoomend', () => { if (edit && edit.tool === 'transform') renderXform(); });
+  map.on('mousemove', editHover);
+  map.on('mousedown', 'edit-vertex', (e) => editVertexDown(e));
+  map.on('mousedown', 'edit-mid', (e) => editEdgeDown(e));
+  for (const l of ['edit-vertex', 'edit-mid']) {
+    map.on('mouseenter', l, () => { if (edit && !edit.drawing) map.getCanvas().style.cursor = 'move'; });
+    map.on('mouseleave', l, () => { if (edit && !edit.drag) map.getCanvas().style.cursor = edit.drawing ? 'crosshair' : ''; });
+  }
+}
+
+function pushUndo() {
+  edit.undo.push(JSON.stringify({ shapes: edit.shapes, sel: edit.sel, vsel: edit.vsel, nextNew: edit.nextNew, multi: edit.multi }));
+  if (edit.undo.length > 100) edit.undo.shift();
+}
+function undoEdit() {
+  if (!edit || !edit.undo.length) return;
+  const s = JSON.parse(edit.undo.pop());
+  Object.assign(edit, { shapes: s.shapes, sel: s.sel, vsel: s.vsel, nextNew: s.nextNew, multi: s.multi || [] });
+  renderEdit();
+}
+
+// Take the room's geometry into the working set (state `mod`) the first time it is changed.
+function touch(key) {
+  if (edit.shapes[key]) return edit.shapes[key];
+  const f = floorRooms().find(r => roomKey(r) === key);
+  return (edit.shapes[key] = { state: 'mod', geometry: clone(f.geometry) });
+}
+
+// ---- overlaps: a room that runs into another is clipped at build time (the room that comes first in the plan keeps
+// the shared area), so what is saved would differ from what is drawn. Edges that cross, or lie inside another room, are drawn red.
+const OVERLAP_TOL_M = 0.05;
+function segCross(p, q, r, t, tol) {   // do p-q and r-t cross, clearly (not just touch or run along each other)?
+  const d1 = [q[0] - p[0], q[1] - p[1]], d2 = [t[0] - r[0], t[1] - r[1]];
+  const den = d1[0] * d2[1] - d1[1] * d2[0];
+  if (Math.abs(den) < 1e-12) return false;
+  const u = ((r[0] - p[0]) * d2[1] - (r[1] - p[1]) * d2[0]) / den, v = ((r[0] - p[0]) * d1[1] - (r[1] - p[1]) * d1[0]) / den;
+  if (u <= 0 || u >= 1 || v <= 0 || v >= 1) return false;
+  // How far the ends of each segment are from the other's line: tiny = the two walls are (nearly) the same line.
+  const side = (a, b, c) => Math.abs((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0])) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1);
+  const da = Math.min(side(r, t, p), side(r, t, q)), db = Math.min(side(p, q, r), side(p, q, t));
+  return da > tol || db > tol;
+}
+function distToSeg(c, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((c[0] - a[0]) * dx + (c[1] - a[1]) * dy) / l2));
+  return Math.hypot(c[0] - a[0] - t * dx, c[1] - a[1] - t * dy);
+}
+function insideRings(rings, c) {   // even-odd over all the rings of one polygon
+  let inside = false;
+  for (const ring of rings) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j];
+    if ((a[1] > c[1]) !== (b[1] > c[1]) && c[0] < (b[0] - a[0]) * (c[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+  }
+  return inside;
+}
+
+function overlapReport() {
+  const changed = Object.entries(edit.shapes).filter(([, sh]) => sh.state !== 'del');
+  if (!changed.length) return { lines: [], pairs: [] };
+  const first = polysOf(changed[0][1].geometry)[0][0][0];
+  const k = [111320 * Math.cos(first[1] * Math.PI / 180), 110540];
+  const prep = (key, geom) => {
+    const polys = polysOf(geom).map(poly => poly.map(ring => ({ ll: ring, pt: ring.map(c => [c[0] * k[0], c[1] * k[1]]) })));
+    const box = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const poly of polys) for (const r of poly) for (const c of r.pt) {
+      box[0] = Math.min(box[0], c[0]); box[1] = Math.min(box[1], c[1]); box[2] = Math.max(box[2], c[0]); box[3] = Math.max(box[3], c[1]);
+    }
+    return { key, polys, box };
+  };
+  const A = changed.map(([key, sh]) => prep(key, sh.geometry));
+  // The common area (remainder) and ratio rooms are cut around the plan's rooms on every build: they give way, so they are
+  // not overlaps. Only rooms with a shape of their own can really collide.
+  const rest = floorRooms().filter(f => !edit.shapes[roomKey(f)] && !['remainder', 'ratio'].includes(f.properties.geometry_source))
+    .map(f => prep(roomKey(f), f.geometry));
+  const all = [...A, ...rest];
+  const red = new Set(), pairs = [];
+  const mark = (ring, j) => red.add([ring.ll[j], ring.ll[j + 1]]);
+  const vertexInside = (x, y) => {   // mark x's edges next to a vertex that lies clearly inside y
+    let hit = false;
+    for (const poly of x.polys) for (const ring of poly) {
+      const n = ring.pt.length - 1;
+      for (let j = 0; j < n; j++) {
+        const c = ring.pt[j];
+        const inY = y.polys.some(py => insideRings(py.map(r => r.pt), c));
+        if (!inY) continue;
+        const depth = Math.min(...y.polys.flatMap(py => py.flatMap(r => r.pt.slice(1).map((b, i) => distToSeg(c, r.pt[i], b)))));
+        if (depth > OVERLAP_TOL_M) { mark(ring, j); mark(ring, (j - 1 + n) % n); hit = true; }
+      }
+    }
+    return hit;
+  };
+  A.forEach((a, ia) => all.forEach((b, ib) => {
+    if (a === b || (ib < A.length && ib < ia)) return;
+    if (a.box[0] > b.box[2] || b.box[0] > a.box[2] || a.box[1] > b.box[3] || b.box[1] > a.box[3]) return;
+    let hit = false;
+    for (const pa of a.polys) for (const ra of pa) for (let i = 0; i < ra.pt.length - 1; i++)
+      for (const pb of b.polys) for (const rb of pb) for (let j = 0; j < rb.pt.length - 1; j++)
+        if (segCross(ra.pt[i], ra.pt[i + 1], rb.pt[j], rb.pt[j + 1], OVERLAP_TOL_M)) { mark(ra, i); mark(rb, j); hit = true; }
+    hit = vertexInside(a, b) || hit;
+    hit = vertexInside(b, a) || hit;
+    if (hit) pairs.push([a.key, b.key]);
+  }));
+  return { lines: [...red], pairs };
+}
+function roomRawName(key) {
+  const sh = edit.shapes[key];
+  if (NAME_EDITED(sh)) return sh.name || tl('New room');
+  const f = floorRooms().find(r => roomKey(r) === key);
+  return f ? f.properties.name : key;
+}
+
+function geomBox(g) {
+  const b = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const poly of polysOf(g)) for (const ring of poly) for (const [x, y] of ring) {
+    b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y);
+  }
+  return b;
+}
+// Bring a room into view (the panes sit beside the map), keeping the camera flat.
+function showGeometry(g) {
+  const b = geomBox(g);   // the panes sit beside the map, so it only needs an even margin
+  map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { maxZoom: 20, duration: 600, padding: { top: 60, bottom: 60, left: 60, right: 60 } });
+}
+// ---- side panes, laid out like geojson.io: the feature list (left) and JSON / Table (right) show the floor's rooms as they
+// are being edited; typing valid JSON or changing a table cell edits the same working set as the map does.
+const NAME_EDITED = (sh) => !!sh && (sh.state === 'new' || sh.merged || sh.attrs);   // shapes that carry their own name / category
+function roomAttrs(key) {
+  const sh = edit.shapes[key], f = floorRooms().find(r => roomKey(r) === key), fp = f ? f.properties : {};
+  if (NAME_EDITED(sh)) {   // a changed (or new) category brings its colour; an unchanged one keeps the room's own
+    const cat = sh.category || 'other';
+    return { name: sh.name || '', category: cat, color: !f || cat !== fp.category ? catColor(cat) : (fp.color || catColor(cat)) };
+  }
+  return f ? { name: fp.name || '', category: fp.category || 'other', color: fp.color || '#999' } : { name: key, category: 'other', color: '#999' };
+}
+function areaM2(g) {
+  let total = 0;
+  for (const poly of polysOf(g)) poly.forEach((ring, k) => {
+    const [x0, y0] = ring[0], kx = 111320 * Math.cos(y0 * Math.PI / 180), ky = 110574;
+    let a = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+      const ax = (ring[i][0] - x0) * kx, ay = (ring[i][1] - y0) * ky, bx = (ring[i + 1][0] - x0) * kx, by = (ring[i + 1][1] - y0) * ky;
+      a += ax * by - bx * ay;
+    }
+    total += (k === 0 ? 1 : -1) * Math.abs(a) / 2;
+  });
+  return total;
+}
+function editRoomRows() {   // every room of the floor (also the ones that cannot be edited) and the rooms added in this session
+  const rows = [], seen = new Set();
+  for (const f of floorRooms()) { const key = roomKey(f); if (seen.has(key)) continue; seen.add(key); rows.push({ key, reason: editableReason(f) }); }
+  for (const key of Object.keys(edit.shapes)) if (!seen.has(key)) rows.push({ key, reason: null });
+  return rows;
+}
+
+// The floor's rooms in the left pane when not editing: click selects (info on the right), double-click zooms to the room.
+function renderViewList() {
+  const ul = document.getElementById('fl-ul');
+  const cur0 = levels().find(l => l.level === currentLevel);
+  document.getElementById('fl-title').textContent = cur0 ? tl('Rooms · {name}', { name: cur0.name }) : tl('Rooms');
+  if (currentLevel === null) {
+    document.getElementById('fl-count').textContent = '';
+    ul.innerHTML = `<li class="hd">${tl('Zoom in on the map and pick a floor to list its rooms.')}</li>`;
+    return;
+  }
+  const rooms = data.features.filter(f => isRoomFeature(f) && f.properties.level === currentLevel);
+  document.getElementById('fl-count').textContent = `${rooms.length}`;
+  ul.innerHTML = rooms.map(f => {
+    const p = f.properties;
+    return `<li data-id="${esc(p.id)}" class="${p.id === selectedId ? 'cur' : ''}" title="${tl('Click to select (double-click to zoom to the room)')}">`
+      + `<span class="sw" style="background:${esc(p.color || '#999')}"></span><span class="nm">${esc(roomName(p.name || p.room_id || ''))}</span>`
+      + `<span class="sub">${f.geometry ? Math.round(areaM2(f.geometry)) + ' m²' : ''}</span></li>`;
+  }).join('');
+  ul.querySelectorAll('li[data-id]').forEach(li => {
+    li.onclick = () => select(li.dataset.id);
+    li.ondblclick = () => { const f = feature(li.dataset.id); if (f && f.geometry) showGeometry(f.geometry); };
+  });
+  const cur = ul.querySelector('li.cur');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+
+let tblLastSel = null;
+function listPick(key, shift) {
+  const f = floorRooms().find(r => roomKey(r) === key), why = f && editableReason(f);
+  if (why) { document.getElementById('edit-msg').textContent = why; return; }
+  if (shift) return multiToggle(key);
+  edit.sel = key; edit.multi = []; edit.vsel = null;
+  select(f ? f.properties.id : null);
+  renderEdit();
+}
+// Category picker with the colours (a native <select> cannot show them): one floating menu, opened from a button.
+let catMenuOpen = null;
+function setCatBtn(btn, c) {
+  btn.dataset.val = c;
+  btn.innerHTML = `<span class="sw" style="background:${esc(catColor(c))}"></span><span class="cn">${esc(catLabel(c))}</span>`;
+}
+function closeCatMenu() { const m = document.getElementById('cat-menu'); if (m) m.hidden = true; catMenuOpen = null; }
+function openCatMenu(anchor, current, onPick) {
+  if (anchor.disabled) return;
+  const m = document.getElementById('cat-menu');
+  const cats = [...new Set([...(edit && edit.cats || CATEGORIES), current])].filter(Boolean);
+  m.innerHTML = cats.map(c => `<button type="button" data-c="${esc(c)}" class="${c === current ? 'cur' : ''}"><span class="sw" style="background:${esc(catColor(c))}"></span>${esc(catLabel(c))}</button>`).join('');
+  m.querySelectorAll('button').forEach(b => b.onclick = () => { closeCatMenu(); if (document.activeElement) document.activeElement.blur(); onPick(b.dataset.c); });
+  const r = anchor.getBoundingClientRect();
+  m.hidden = false;
+  m.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - m.offsetWidth - 4))}px`;
+  m.style.top = `${r.bottom + 2 + m.offsetHeight > window.innerHeight ? Math.max(4, r.top - m.offsetHeight - 2) : r.bottom + 2}px`;
+  catMenuOpen = anchor;
+}
+
+// Table: name and category are editable cells.
+function setAttr(key, patch) {
+  const sh = edit.shapes[key];
+  if (sh && sh.state === 'del') return;
+  const cur = roomAttrs(key);
+  pushUndo();
+  const t = touch(key);
+  if (t.state !== 'new' && !t.merged) t.attrs = true;
+  t.name = patch.name ?? t.name ?? cur.name;
+  t.category = patch.category ?? t.category ?? cur.category;
+  renderEdit();
+}
+function renderTable() {
+  const tb = document.querySelector('#attr-table tbody');
+  if (tb.contains(document.activeElement)) return;   // keep the focus while someone is typing in a cell
+  tb.innerHTML = editRoomRows().map(({ key, reason }) => {
+    const sh = edit.shapes[key], del = sh && sh.state === 'del', a = roomAttrs(key), g = workingGeometry(key);
+    const dis = reason || del ? ' disabled' : '';
+    const st = sh ? sh.state : '';
+    return `<tr data-key="${esc(key)}" class="${[key === edit.sel ? 'cur' : '', edit.multi.includes(key) ? 'multi' : '', reason ? 'locked' : '', del ? 'del' : ''].join(' ')}" title="${esc(reason || '')}">`
+      + `<td class="id" title="${esc(reason || key)}">${esc(key)}</td>`
+      + `<td><input data-f="name" value="${esc(roomRawName(key))}"${dis}></td><td class="cat"><button type="button" class="catbtn" data-f="category" data-val="${esc(a.category)}"${dis}><span class="sw" style="background:${esc(a.color)}"></span><span class="cn">${esc(catLabel(a.category))}</span></button></td>`
+      + `<td class="num">${g ? Math.round(areaM2(g)) : ''}</td>`
+      + `<td>${st ? `<span class="tag ${st}">${sh.merged ? tl('Merge') : { new: tl('Added'), mod: tl('Changed'), del: tl('Deleted') }[st]}</span>` : ''}</td></tr>`;
+  }).join('');
+  if (edit.sel !== tblLastSel) {   // a room picked on the map scrolls into view in the table
+    tblLastSel = edit.sel;
+    const cur = tb.querySelector('tr.cur');
+    if (cur) cur.scrollIntoView({ block: 'nearest' });
+  }
+  tb.querySelectorAll('tr').forEach(tr => {
+    const key = tr.dataset.key;
+    tr.querySelector('td.id').onclick = (ev) => listPick(key, ev.shiftKey);
+    tr.querySelector('td.id').ondblclick = () => { const g = workingGeometry(key); if (g) showGeometry(g); };
+    tr.querySelector('[data-f=name]').onchange = (e) => setAttr(key, { name: e.target.value });
+    tr.querySelector('[data-f=category]').onclick = (e) => openCatMenu(e.currentTarget, e.currentTarget.dataset.val, (c) => setAttr(key, { category: c }));
+  });
+}
+
+// JSON: the editable rooms of the floor as a FeatureCollection (id = the room's id, name, category).
+const roundGeom = (g) => ({ type: g.type, coordinates: mapCoords(g.coordinates, c => [Math.round(c[0] * 1e8) / 1e8, Math.round(c[1] * 1e8) / 1e8]) });
+function floorJson() {
+  const feats = editRoomRows().filter(r => !r.reason && !(edit.shapes[r.key] && edit.shapes[r.key].state === 'del')).map(({ key }) => ({
+    type: 'Feature', properties: { id: key, name: roomLabel(key), category: roomAttrs(key).category }, geometry: roundGeom(workingGeometry(key)) }));
+  return JSON.stringify({ type: 'FeatureCollection', features: feats }, null, 2)
+    .replace(/\[\s+(-?[\d.e+-]+),\s+(-?[\d.e+-]+)\s+\]/g, '[$1, $2]');   // one position per line
+}
+function validGeom(g) {
+  if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon') || !Array.isArray(g.coordinates)) return false;
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  return polys.length > 0 && polys.every(poly => Array.isArray(poly) && poly.length > 0 && poly.every(r => Array.isArray(r) && r.length >= 4
+    && r.every(c => Array.isArray(c) && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1]))
+    && r[0][0] === r[r.length - 1][0] && r[0][1] === r[r.length - 1][1]));
+}
+// Apply edited JSON: a changed shape / name / category updates the room (matched by `id`), a feature without a known `id` is a
+// new room, a room missing from the JSON is deleted. Returns an error message, or null.
+function applyJson(text) {
+  let fc;
+  try { fc = JSON.parse(text); } catch (e) { return tl('Cannot read it as JSON: {message}', { message: e.message }); }
+  if (!fc || fc.type !== 'FeatureCollection' || !Array.isArray(fc.features)) return tl('A FeatureCollection is required.');
+  const rows = editRoomRows().filter(r => !r.reason), keys = new Set(rows.map(r => r.key));
+  const incoming = new Map(), adds = [];
+  for (const [i, f] of fc.features.entries()) {
+    if (!f || f.type !== 'Feature' || !validGeom(f.geometry)) return tl('Feature #{n}: a closed Polygon / MultiPolygon is required.', { n: i + 1 });
+    const id = f.properties && f.properties.id != null ? String(f.properties.id) : null;
+    if (id && keys.has(id) && !incoming.has(id)) incoming.set(id, f); else adds.push(f);
+  }
+  const same = (a, b) => JSON.stringify(roundGeom(a)) === JSON.stringify(roundGeom(b));
+  const changes = [];
+  for (const { key } of rows) {
+    const sh = edit.shapes[key], gone = !!sh && sh.state === 'del', f = incoming.get(key);
+    if (!f) {
+      if (!gone) changes.push(() => { if (edit.shapes[key] && edit.shapes[key].state === 'new') delete edit.shapes[key]; else touch(key).state = 'del'; });
+      continue;
+    }
+    const p = f.properties || {};
+    const gChanged = gone || !same(workingGeometry(key), f.geometry);
+    const nChanged = p.name != null && String(p.name) !== roomLabel(key);
+    const cChanged = p.category != null && String(p.category) !== roomAttrs(key).category;
+    if (gChanged || nChanged || cChanged) changes.push(() => {
+      const cur = roomAttrs(key), t = touch(key);
+      if (gone) t.state = 'mod';
+      if (gChanged) t.geometry = clone(f.geometry);
+      if (nChanged || cChanged) {
+        if (t.state !== 'new' && !t.merged) t.attrs = true;
+        t.name = nChanged ? String(p.name) : (t.name ?? cur.name);
+        t.category = cChanged ? String(p.category) : (t.category ?? cur.category);
+      }
+    });
+  }
+  for (const f of adds) changes.push(() => {
+    const p = f.properties || {};
+    edit.shapes[`new-${edit.nextNew++}`] = { state: 'new', geometry: clone(f.geometry), name: String(p.name || '').trim(), category: p.category ? String(p.category) : 'other' };
+  });
+  if (!changes.length) return null;
+  pushUndo();
+  changes.forEach(c => c());
+  renderEdit();
+  return null;
+}
+let jsonTimer = null, jsonApplyTimer = null;
+function scheduleJson() {   // rewrite the text after the edit state changed, unless it is being typed in
+  clearTimeout(jsonTimer);
+  jsonTimer = setTimeout(() => {
+    const ta = document.getElementById('json-text');
+    if (!edit || document.activeElement === ta) return;
+    const t = floorJson();
+    if (ta.value !== t) ta.value = t;
+    document.getElementById('json-err').textContent = '';
+  }, 120);
+}
+function renderSidePanes() { renderTable(); scheduleJson(); }
+
+function renderEdit() {
+  if (!edit) return;
+  const shapes = Object.entries(edit.shapes).map(([key, sh]) => ({ type: 'Feature', geometry: sh.geometry,
+    properties: { key, state: sh.state, label: roomLabel(key), sel: key === edit.sel ? 1 : 0, multi: edit.multi.includes(key) ? 1 : 0, ref: edit.multi.length >= 2 && key === edit.multi[0] ? 1 : 0 } }));
+  for (const key of edit.multi) if (!edit.shapes[key]) {
+    const g = workingGeometry(key);
+    if (g) shapes.push({ type: 'Feature', geometry: g, properties: { key, state: 'multi', sel: 0, multi: 1 } });
+  }
+  // The selected room's outline is drawn even when untouched, so its vertices have something to sit on.
+  if (edit.sel && !edit.shapes[edit.sel] && !edit.multi.includes(edit.sel)) {
+    const g = workingGeometry(edit.sel);
+    if (g) shapes.push({ type: 'Feature', geometry: g, properties: { key: edit.sel, state: 'sel', sel: 1 } });
+  }
+  map.getSource('edit-shapes').setData({ type: 'FeatureCollection', features: shapes });
+
+  const verts = [], mids = [];
+  const sh = edit.sel && edit.shapes[edit.sel];
+  const g = edit.tool === 'select' && edit.sel && edit.multi.length < 2 && !(sh && sh.state === 'del') ? workingGeometry(edit.sel) : null;
+  if (g) polysOf(g).forEach((poly, p) => poly.forEach((ring, r) => {
+    for (let i = 0; i < ring.length - 1; i++) {
+      const isSel = edit.vsel && edit.vsel.key === edit.sel && edit.vsel.p === p && edit.vsel.r === r && edit.vsel.i === i;
+      verts.push({ type: 'Feature', geometry: { type: 'Point', coordinates: ring[i] }, properties: { p, r, i, sel: isSel ? 1 : 0 } });
+      const a = ring[i], b = ring[i + 1];
+      mids.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] }, properties: { p, r, i } });
+    }
+  }));
+  map.getSource('edit-vertices').setData({ type: 'FeatureCollection', features: verts });
+  map.getSource('edit-mids').setData({ type: 'FeatureCollection', features: mids });
+  const ov = overlapReport();
+  edit.overlaps = ov.pairs;
+  map.getSource('edit-overlap').setData({ type: 'FeatureCollection', features: ov.lines.map(c => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: c } })) });
+  const warn = document.getElementById('edit-warn');
+  warn.hidden = !ov.pairs.length;
+  warn.style.whiteSpace = 'pre-line';
+  warn.textContent = (ov.pairs.length ? tl('⚠ Some rooms overlap ({n} pairs: {pairs}). On saving, the room listed first in the plan keeps the overlap and the later one is cut.', {
+    n: ov.pairs.length, pairs: ov.pairs.slice(0, 3).map(([a, b]) => `${roomLabel(a)} × ${roomLabel(b)}`).join(JOIN) + (ov.pairs.length > 3 ? ' …' : '') }) : '');
+  renderSidePanes();
+  const dr = edit.drawing;
+  const lines = [...(dr && dr.length ? [dr] : []), ...(edit.guide || []), ...(edit.preview ? [edit.preview] : [])];
+  map.getSource('edit-draw').setData({ type: 'FeatureCollection', features: lines.map(c => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: c } })) });
+
+  const f = edit.sel && floorRooms().find(r => roomKey(r) === edit.sel);
+  const name = sh && (sh.state === 'new' || sh.merged) ? (sh.name || tl('New room')) : f ? f.properties.name : null;
+  const n = Object.keys(edit.shapes).length;
+  const multi = edit.multi.length >= 2;
+  document.getElementById('edit-step').textContent = multi ? tl('{n} rooms selected: {rooms}. The purple outline is the reference (the first selected). Use Merge or the align buttons (Shift+click to add / remove).', {
+        n: edit.multi.length, rooms: edit.multi.slice(0, 4).map(roomLabel).join(JOIN) + (edit.multi.length > 4 ? ' …' : '') })
+    : dr ? tl('New room: click the vertices in order ({n} points). Click the first point or press Enter to finish, Esc to cancel.', { n: dr.length })
+    : edit.tool === 'rect' ? tl('Rectangle: click two opposite corners (or drag). Esc to cancel.')
+    : edit.tool === 'transform' ? (xformKeys().length ? tl('{n} rooms selected: drag to move, corners to scale, the green dot to rotate (Shift snaps to 15°).', { n: xformKeys().length }) : tl('Click the rooms to move / rotate / scale (Shift+click for several).'))
+    : edit.tool === 'map' ? tl('Moving the floor map: drag on the map to move, corners to scale, the slider on the right to rotate. Save with "Save this floor only" in the right pane.')
+    : name ? tl('Selected: {name}', { name }) + (sh && sh.state === 'del' ? tl(' (to be deleted)') : '') + (edit.vsel ? tl(' · vertex selected') : '')
+    : tl('Click a room to show its vertices. Draw new rooms with the polygon / rectangle tools in the top bar.');
+  document.getElementById('edit-del-room').disabled = !edit.sel || dr || (sh && sh.state === 'del');
+  for (const b of document.querySelectorAll('#edit-tools [data-tool]')) {
+    b.classList.toggle('on', b.dataset.tool === edit.tool);
+  }
+  const inMap = edit.tool === 'map';
+  for (const b of document.querySelectorAll('#edit-mode [data-mode]')) {
+    b.classList.toggle('on', (b.dataset.mode === 'map') === inMap);
+    if (b.dataset.mode === 'map') b.disabled = !LIVE || !basemapFor(edit.level);
+  }
+  document.getElementById('map-unsaved').hidden = !(inMap && Object.keys(edit.shapes).length);
+  document.getElementById('edit-map-pane').classList.toggle('open', edit.tool === 'map');
+  document.body.classList.toggle('map-tool', edit.tool === 'map');   // the floor-map controls replace the tool card
+  renderXform();
+  document.getElementById('edit-merge').disabled = !multi || !!dr;
+  document.getElementById('edit-align').hidden = !multi || !!dr;
+  document.getElementById('edit-finish').hidden = !dr;
+  document.getElementById('edit-finish').disabled = !dr || dr.length < 3;
+  document.getElementById('edit-undo').disabled = !edit.undo.length;
+  document.getElementById('edit-save').disabled = !n;
+  const nm = document.getElementById('edit-new');
+  const named = !!(sh && (sh.state === 'new' || sh.merged)) && !multi;
+  nm.classList.toggle('open', named);
+  if (named) {
+    const inp = document.getElementById('edit-new-name'), cat = document.getElementById('edit-new-category');
+    if (document.activeElement !== inp) inp.value = sh.name || '';
+    setCatBtn(cat, sh.category || 'other');
+  }
+}
+
+// ---- snapping: to the vertices of other rooms of this floor (and of the room itself), within a few pixels
+// Lines through `b` at a right angle to the edge a->b (anchors = [{a, b}]): the cursor snaps to one, or to the corner of two.
+const ORTHO_PX = 8;
+function orthoSnap(point, anchors) {
+  const P = [point.x, point.y];
+  const lines = [];
+  for (const { a, b } of anchors) {
+    const A = map.project(a), B = map.project(b);
+    const len = Math.hypot(B.x - A.x, B.y - A.y);
+    if (len < 4) continue;
+    const d = [(B.x - A.x) / len, (B.y - A.y) / len];
+    const off = (P[0] - B.x) * d[0] + (P[1] - B.y) * d[1];   // distance of the cursor from the perpendicular through B
+    if (Math.abs(off) < ORTHO_PX) lines.push({ b, B: [B.x, B.y], d, off });
+  }
+  if (!lines.length) return null;
+  lines.sort((x, y) => Math.abs(x.off) - Math.abs(y.off));
+  let X = [P[0] - lines[0].off * lines[0].d[0], P[1] - lines[0].off * lines[0].d[1]], used = [lines[0]];
+  if (lines.length > 1) {
+    const [l1, l2] = lines, det = l1.d[0] * l2.d[1] - l1.d[1] * l2.d[0];
+    if (Math.abs(det) > 0.2) {   // not parallel: the corner where both perpendiculars meet
+      const c1 = l1.d[0] * l1.B[0] + l1.d[1] * l1.B[1], c2 = l2.d[0] * l2.B[0] + l2.d[1] * l2.B[1];
+      X = [(c1 * l2.d[1] - c2 * l1.d[1]) / det, (l1.d[0] * c2 - l2.d[0] * c1) / det];
+      used = [l1, l2];
+    }
+  }
+  const ll = map.unproject(X);
+  return { ll: [ll.lng, ll.lat], guides: used.map(l => [l.b, [ll.lng, ll.lat]]), lines: used };
+}
+
+// Walls other rooms and the building outline offer: [[lngLat, lngLat], ...] (cached while a drag / drawing lasts).
+function wallEdges(excludeKey) {
+  const out = [];
+  const addG = (g) => polysOf(g).forEach(poly => poly.forEach(ring => { for (let i = 0; i < ring.length - 1; i++) out.push([ring[i], ring[i + 1]]); }));
+  const seen = new Set();
+  for (const [key, sh] of Object.entries(edit.shapes)) { seen.add(key); if (key !== excludeKey && sh.state !== 'del') addG(sh.geometry); }
+  for (const f of floorRooms()) { const k = roomKey(f); if (!seen.has(k) && k !== excludeKey) addG(f.geometry); }
+  const fp = (data.metadata || {}).footprint;
+  if (fp && (fp.type === 'Polygon' || fp.type === 'MultiPolygon')) addG(fp);
+  return out;
+}
+const WALL_PX = 8;
+
+// The point of a wall nearest the cursor (within WALL_PX). With a right-angle line `o` (from orthoSnap) it prefers the
+// place where that line meets a wall: a corner that is both square and on the wall.
+function wallSnap(point, o, walls) {
+  let best = null;
+  for (const [A, B] of walls) {
+    const a = map.project(A), b = map.project(B);
+    const ex = b.x - a.x, ey = b.y - a.y, len2 = ex * ex + ey * ey;
+    if (len2 < 1) continue;
+    const t = Math.max(0, Math.min(1, ((point.x - a.x) * ex + (point.y - a.y) * ey) / len2));
+    const X = [a.x + t * ex, a.y + t * ey], d = Math.hypot(point.x - X[0], point.y - X[1]);
+    if (d < WALL_PX && (!best || d < best.d)) best = { d, X, wall: [A, B], guides: [] };
+    if (o && o.lines.length === 1) {
+      const { B: Bo, d: dir } = o.lines[0], den = ex * dir[0] + ey * dir[1];
+      if (Math.abs(den) > 1e-6 * Math.sqrt(len2)) {
+        const u = ((Bo[0] - a.x) * dir[0] + (Bo[1] - a.y) * dir[1]) / den;
+        if (u >= 0 && u <= 1) {
+          const Y = [a.x + u * ex, a.y + u * ey], dy = Math.hypot(point.x - Y[0], point.y - Y[1]);
+          if (dy < WALL_PX && (!best || best.guides.length === 0 || dy < best.d)) best = { d: dy, X: Y, wall: [A, B], guides: o.guides };
+        }
+      }
+    }
+  }
+  if (!best) return null;
+  const ll = map.unproject(best.X);
+  return { ll: [ll.lng, ll.lat], guides: [best.wall, ...best.guides.map(g => [g[0], [ll.lng, ll.lat]])] };
+}
+
+function snapTo(point, lngLat, skip, anchors) {
+  const best = { d: 10, ll: null };
+  const consider = (g, key) => polysOf(g).forEach((poly, p) => poly.forEach((ring, r) => {
+    for (let i = 0; i < ring.length - 1; i++) {
+      if (skip && skip.key === key && skip.p === p && skip.r === r && skip.i === i) continue;
+      const s = map.project(ring[i]), d = Math.hypot(s.x - point.x, s.y - point.y);
+      if (d < best.d) { best.d = d; best.ll = ring[i]; }
+    }
+  }));
+  const seen = new Set();
+  for (const [key, sh] of Object.entries(edit.shapes)) { seen.add(key); if (sh.state !== 'del') consider(sh.geometry, key); }
+  for (const f of floorRooms()) if (!seen.has(roomKey(f))) consider(f.geometry, roomKey(f));
+  edit.guide = null;
+  if (best.ll) return best.ll;                                   // 1. a vertex of another room
+  const o = anchors && anchors.length && document.getElementById('edit-ortho').checked ? orthoSnap(point, anchors) : null;
+  if (o && o.guides.length > 1) { edit.guide = o.guides; return o.ll; }   // 2. a square corner
+  const w = wallSnap(point, o, edit.walls || (edit.walls = wallEdges(skip && skip.key)));
+  if (w) { edit.guide = w.guides; return w.ll; }                 // 3. a point on a wall
+  if (o) { edit.guide = o.guides; return o.ll; }                 // 4. square to one neighbouring edge
+  return [lngLat.lng, lngLat.lat];
+}
+
+// The edges next to ring vertex i: it should stay perpendicular to the edge before the previous vertex / after the next one.
+function vertexAnchors(ring, i) {
+  const n = ring.length - 1;
+  if (n < 4) return [];
+  const at = (k) => ring[((k % n) + n) % n];
+  return [{ a: at(i - 2), b: at(i - 1) }, { a: at(i + 2), b: at(i + 1) }];
+}
+
+function editVertexDown(e) {
+  if (!edit || edit.drawing || !e.features.length) return;
+  const { p, r, i } = e.features[0].properties;
+  e.preventDefault();
+  pushUndo();
+  const sh = touch(edit.sel);
+  const idx = i;
+  edit.vsel = { key: edit.sel, p, r, i: idx };
+  edit.walls = null;
+  edit.drag = { key: edit.sel, p, r, i: idx, moved: false, from: e.point };
+  map.dragPan.disable();
+  map.getCanvas().style.cursor = 'grabbing';
+  renderEdit();
+  const move = (ev) => {
+    const d = edit.drag; if (!d) return;
+    if (!d.moved && Math.hypot(ev.point.x - d.from.x, ev.point.y - d.from.y) < 3) return;
+    d.moved = true;
+    const rg = polysOf(edit.shapes[d.key].geometry)[d.p][d.r];
+    const ll = ev.originalEvent.altKey ? (edit.guide = null, [ev.lngLat.lng, ev.lngLat.lat]) : snapTo(ev.point, ev.lngLat, d, vertexAnchors(rg, d.i));
+    rg[d.i] = ll;
+    if (d.i === 0) rg[rg.length - 1] = ll;
+    renderEdit();
+  };
+  const up = () => {
+    map.off('mousemove', move); map.off('mouseup', up);
+    map.dragPan.enable();
+    if (edit) {
+      edit.guide = null; edit.walls = null;
+      map.getCanvas().style.cursor = '';
+      if (!edit.drag.moved) {   // a plain click only selects the vertex: drop the change it prepared
+        const before = JSON.parse(edit.undo.pop());
+        edit.shapes = before.shapes; edit.nextNew = before.nextNew;
+      }
+      edit.suppressClick = true;
+      setTimeout(() => { if (edit) edit.suppressClick = false; }, 0);   // the click after a drag never fires if the pointer moved
+      edit.drag = null;
+      renderEdit();
+    }
+  };
+  map.on('mousemove', move); map.on('mouseup', up);
+}
+
+// ---- edges: the circle at an edge's middle moves the whole edge; a click on the edge adds a vertex there
+function nearestEdgePoint(point) {
+  const g = edit.sel && workingGeometry(edit.sel);
+  const sh = edit.sel && edit.shapes[edit.sel];
+  if (!g || (sh && sh.state === 'del')) return null;
+  let best = null;
+  polysOf(g).forEach((poly, p) => poly.forEach((ring, r) => {
+    for (let i = 0; i < ring.length - 1; i++) {
+      const A = map.project(ring[i]), B = map.project(ring[i + 1]);
+      const dx = B.x - A.x, dy = B.y - A.y, len2 = dx * dx + dy * dy;
+      if (len2 < 1) continue;
+      const t = Math.max(0, Math.min(1, ((point.x - A.x) * dx + (point.y - A.y) * dy) / len2));
+      const X = { x: A.x + t * dx, y: A.y + t * dy };
+      const d = Math.hypot(point.x - X.x, point.y - X.y);
+      const toEnd = Math.min(Math.hypot(X.x - A.x, X.y - A.y), Math.hypot(X.x - B.x, X.y - B.y));
+      if (d < 7 && toEnd > 9 && (!best || d < best.d)) { const ll = map.unproject(X); best = { d, p, r, i, ll: [ll.lng, ll.lat] }; }
+    }
+  }));
+  return best;
+}
+
+function onHandle(point) { return map.queryRenderedFeatures(point, { layers: ['edit-vertex', 'edit-mid'] }).length > 0; }
+
+function editHover(e) {
+  if (!edit || edit.drawing || edit.drag) return;
+  if (edit.tool === 'transform') return xformHover(e);
+  if (edit.tool !== 'select') return;
+  const hit = !onHandle(e.point) && nearestEdgePoint(e.point);
+  map.getSource('edit-hint').setData(hit ? { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: hit.ll } } : emptyFC());
+  if (hit) map.getCanvas().style.cursor = 'copy';
+  else if (!onHandle(e.point)) map.getCanvas().style.cursor = '';
+}
+
+function insertVertexAt(hit) {
+  pushUndo();
+  const rg = polysOf(touch(edit.sel).geometry)[hit.p][hit.r];
+  rg.splice(hit.i + 1, 0, hit.ll);
+  edit.vsel = { key: edit.sel, p: hit.p, r: hit.r, i: hit.i + 1 };
+  map.getSource('edit-hint').setData(emptyFC());
+  renderEdit();
+}
+
+function editEdgeDown(e) {
+  if (!edit || edit.drawing || !e.features.length) return;
+  const { p, r, i } = e.features[0].properties;
+  e.preventDefault();
+  pushUndo();
+  const ring = polysOf(touch(edit.sel).geometry)[p][r];
+  const n = ring.length - 1, at = (k) => ring[((k % n) + n) % n];
+  const scr = (ll) => { const q = map.project(ll); return [q.x, q.y]; };
+  const orig = [scr(ring[i]), scr(ring[i + 1])];
+  const dir = [orig[1][0] - orig[0][0], orig[1][1] - orig[0][1]], len = Math.hypot(...dir) || 1;
+  const perp = (a, b) => {   // is the neighbouring edge a->b at a right angle (within ~6°) to this edge?
+    const u = [scr(b)[0] - scr(a)[0], scr(b)[1] - scr(a)[1]], l = Math.hypot(...u) || 1;
+    return Math.abs((u[0] * dir[0] + u[1] * dir[1]) / l / len) < 0.1;
+  };
+  const rect = n >= 4 && perp(at(i - 1), at(i)) && perp(at(i + 1), at(i + 2));
+  const normal = [-dir[1] / len, dir[0] / len];
+  edit.vsel = null; edit.walls = null;
+  edit.drag = { moved: false, from: e.point };
+  map.dragPan.disable();
+  map.getCanvas().style.cursor = 'grabbing';
+  const move = (ev) => {
+    if (!edit.drag.moved && Math.hypot(ev.point.x - e.point.x, ev.point.y - e.point.y) < 3) return;
+    edit.drag.moved = true;
+    let d = [ev.point.x - e.point.x, ev.point.y - e.point.y];
+    // Walls of a rectangle: slide the edge along its neighbours instead of shearing them.
+    if (rect && !ev.originalEvent.altKey && document.getElementById('edit-ortho').checked) {
+      const k = d[0] * normal[0] + d[1] * normal[1];
+      d = [normal[0] * k, normal[1] * k];
+    }
+    edit.guide = null;
+    if (!ev.originalEvent.altKey) {   // snap the edge onto a parallel wall (other rooms, the building outline)
+      const walls = edit.walls || (edit.walls = wallEdges(edit.sel));
+      const e1 = [dir[0] / len, dir[1] / len];
+      const M = [(orig[0][0] + orig[1][0]) / 2 + d[0], (orig[0][1] + orig[1][1]) / 2 + d[1]];
+      const along = (q) => q[0] * e1[0] + q[1] * e1[1];
+      const lo = Math.min(along(orig[0]), along(orig[1])) + along(d), hi = Math.max(along(orig[0]), along(orig[1])) + along(d);
+      let bestS = null;
+      for (const [A, B] of walls) {
+        const a = scr(A), b = scr(B), wl = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (wl < 2) continue;
+        const u = [(b[0] - a[0]) / wl, (b[1] - a[1]) / wl];
+        if (Math.abs(u[0] * e1[1] - u[1] * e1[0]) > 0.087) continue;                   // not parallel (~5°)
+        if (Math.min(hi, Math.max(along(a), along(b))) - Math.max(lo, Math.min(along(a), along(b))) < 4) continue;   // no overlap
+        const sd = (M[0] - a[0]) * normal[0] + (M[1] - a[1]) * normal[1];
+        if (Math.abs(sd) < WALL_PX && (!bestS || Math.abs(sd) < Math.abs(bestS.sd))) bestS = { sd, wall: [A, B] };
+      }
+      if (bestS) { d = [d[0] - bestS.sd * normal[0], d[1] - bestS.sd * normal[1]]; edit.guide = [bestS.wall]; }
+    }
+    const moved = orig.map(o => { const ll = map.unproject([o[0] + d[0], o[1] + d[1]]); return [ll.lng, ll.lat]; });
+    const sg = polysOf(edit.shapes[edit.sel].geometry)[p][r];
+    sg[i] = moved[0]; sg[i + 1] = moved[1];
+    if (i === 0) sg[sg.length - 1] = moved[0];
+    if (i + 1 === n) sg[0] = moved[1], sg[sg.length - 1] = moved[1];
+    renderEdit();
+  };
+  const up = () => {
+    map.off('mousemove', move); map.off('mouseup', up);
+    map.dragPan.enable();
+    if (edit) {
+      if (!edit.drag.moved) {   // a plain click: nothing changed
+        const before = JSON.parse(edit.undo.pop());
+        edit.shapes = before.shapes; edit.nextNew = before.nextNew;
+      }
+      edit.suppressClick = true;
+      setTimeout(() => { if (edit) edit.suppressClick = false; }, 0);   // the click after a drag never fires if the pointer moved
+      edit.drag = null; edit.guide = null; edit.walls = null;
+      map.getCanvas().style.cursor = '';
+      renderEdit();
+    }
+  };
+  map.on('mousemove', move); map.on('mouseup', up);
+}
+
+function editMapClick(e) {
+  if (edit.suppressClick) { edit.suppressClick = false; return; }
+  if (edit.tool === 'map') return;
+  if (edit.tool === 'rect') return rectClick(e);
+  if (edit.drawing) return drawClick(e);
+  const shift = e.originalEvent.shiftKey;
+  const edgeHit = edit.tool === 'select' && !shift && !onHandle(e.point) && nearestEdgePoint(e.point);
+  if (edgeHit) return insertVertexAt(edgeHit);
+  const hits = map.queryRenderedFeatures(e.point, { layers: ['edit-fill', 'indoor-room-pick'] });
+  edit.vsel = null;
+  const pick = hits.find(h => h.layer.id === 'edit-fill') || hits[0];
+  if (shift) return multiClick(pick);
+  edit.multi = [];
+  if (!pick) { edit.sel = null; select(null); return renderEdit(); }
+  if (pick.layer.id === 'edit-fill') {
+    edit.sel = pick.properties.key;
+    const f = floorRooms().find(r => roomKey(r) === edit.sel);
+    select(f ? f.properties.id : null);
+  } else {
+    const f = feature(pick.properties.id);
+    const why = f && editableReason(f);
+    if (why) { document.getElementById('edit-msg').textContent = why; edit.sel = null; select(f.properties.id); return renderEdit(); }
+    edit.sel = roomKey(f);
+    select(f.properties.id);
+  }
+  if (edit.tool === 'select') document.getElementById('edit-msg').textContent = tl('Drag a vertex to move it, drag an edge\'s "○" to move the whole edge in parallel, click an edge to add a vertex, select a vertex and press Delete to remove it.');
+  renderEdit();
+}
+
+// ---- merging: Shift+click collects rooms, 結合 unites their shapes (polygon-clipping, loaded on first use)
+const CLIPPER_URL = 'https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js';
+const CLIPPER_SRI = 'sha384-2gzcIyrtB96QDjrxsFcJ1O461CWiXJ8fiHgIkJLwTgy4WTktHXTOXt4dviXz9Y5Q';
+let clipperPromise = null;
+function loadClipper() {
+  if (window.polygonClipping) return Promise.resolve(window.polygonClipping);
+  if (!clipperPromise) clipperPromise = new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = CLIPPER_URL; el.integrity = CLIPPER_SRI; el.crossOrigin = 'anonymous';
+    el.onload = () => resolve(window.polygonClipping);
+    el.onerror = () => { clipperPromise = null; reject(new Error(tl('Could not load polygon-clipping'))); };
+    document.head.appendChild(el);
+  });
+  return clipperPromise;
+}
+
+function multiClick(pick) {
+  const msg = document.getElementById('edit-msg');
+  if (!pick) return;
+  let key, f;
+  if (pick.layer.id === 'edit-fill') { key = pick.properties.key; f = floorRooms().find(r => roomKey(r) === key); }
+  else { f = feature(pick.properties.id); key = f && roomKey(f); const why = f && editableReason(f); if (why) { msg.textContent = why; return; } }
+  if (!key) return;
+  multiToggle(key);
+}
+
+function multiToggle(key) {
+  const msg = document.getElementById('edit-msg');
+  const sh = edit.shapes[key];
+  if (sh && sh.state === 'del') { msg.textContent = tl('A room marked for deletion cannot be merged.'); return; }
+  if (!edit.multi.length && edit.sel && edit.sel !== key) edit.multi = [edit.sel];
+  edit.multi = edit.multi.includes(key) ? edit.multi.filter(k => k !== key) : [...edit.multi, key];
+  edit.sel = edit.multi.length ? edit.multi[edit.multi.length - 1] : null;
+  select(null);
+  msg.textContent = edit.multi.length >= 2 ? tl('The first selected room (purple outline) is the reference. Use the align buttons to match edges, widths and walls, or Merge to make one room named after the first.') : tl('Shift+click to select at least one more room.');
+  renderEdit();
+}
+
+// Vertices of the rooms that nearly coincide (< 3 cm) are made identical, so rooms that share a wall by a hair's breadth unite.
+function snapNearVertices(geoms) {
+  const k = [111320 * Math.cos(polysOf(geoms[0])[0][0][0][1] * Math.PI / 180), 110540];
+  const seen = [];
+  for (const g of geoms) for (const poly of polysOf(g)) for (const ring of poly) {
+    for (let i = 0; i < ring.length - 1; i++) {
+      const hit = seen.find(c => Math.hypot((c[0] - ring[i][0]) * k[0], (c[1] - ring[i][1]) * k[1]) < 0.03);
+      if (hit) ring[i] = [hit[0], hit[1]]; else seen.push(ring[i]);
+    }
+    ring[ring.length - 1] = ring[0];
+  }
+}
+// Drops repeated points and vertices lying on the straight line between their neighbours (< 1 cm off it).
+function simplifyRing(ring, k) {
+  let pts = ring.slice(0, -1);
+  for (let changed = true; changed && pts.length > 3;) {
+    changed = false;
+    for (let i = 0; i < pts.length && pts.length > 3; i++) {
+      const a = pts[(i + pts.length - 1) % pts.length], b = pts[i], c = pts[(i + 1) % pts.length];
+      const m = (q) => [q[0] * k[0], q[1] * k[1]], A = m(a), B = m(b), C = m(c);
+      if (Math.hypot(B[0] - A[0], B[1] - A[1]) < 0.01 || distToSeg(B, A, C) < 0.01) { pts.splice(i, 1); i--; changed = true; }
+    }
+  }
+  return [...pts, pts[0]];
+}
+
+// Pieces that do not touch are joined by filling the gap between their nearest walls: the convex hull of the vertices of each piece
+// that lie near the other piece (within MERGE_GAP_MAX_M) is added, nearest pair of pieces first, until one shape is left.
+const MERGE_GAP_MAX_M = 5;
+function bridgeGaps(pc, polys) {
+  const lat = polys[0][0][0][1], k = [111320 * Math.cos(lat * Math.PI / 180), 110540];
+  const m = (c) => [c[0] * k[0], c[1] * k[1]];
+  const hull = (pts) => {
+    pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const half = (arr) => { const h = []; for (const p of arr) { while (h.length >= 2 && cr(h[h.length - 2], h[h.length - 1], p) <= 0) h.pop(); h.push(p); } h.pop(); return h; };
+    return half(pts).concat(half(pts.slice().reverse()));
+  };
+  const outline = (poly) => poly[0].map(m);
+  const toOutDist = (c, o) => { let d = Infinity; for (let i = 0; i < o.length - 1; i++) d = Math.min(d, distToSeg(c, o[i], o[i + 1])); return d; };
+  const footOn = (c, o) => {
+    let best = null;
+    for (let i = 0; i < o.length - 1; i++) {
+      const a = o[i], b = o[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((c[0] - a[0]) * dx + (c[1] - a[1]) * dy) / l2)), q = [a[0] + t * dx, a[1] + t * dy], d = Math.hypot(c[0] - q[0], c[1] - q[1]);
+      if (!best || d < best.d) best = { d, q };
+    }
+    return best.q;
+  };
+  let cur = polys.slice(), worst = 0;
+  while (cur.length > 1) {
+    let best = null;
+    for (let i = 0; i < cur.length; i++) for (let j = i + 1; j < cur.length; j++) {
+      const oi = outline(cur[i]), oj = outline(cur[j]);
+      let d = Infinity;
+      for (const c of oi) d = Math.min(d, toOutDist(c, oj));
+      for (const c of oj) d = Math.min(d, toOutDist(c, oi));
+      if (!best || d < best.d) best = { i, j, d, oi, oj };
+    }
+    if (best.d > MERGE_GAP_MAX_M) return { ok: false, gap: best.d, far: true };
+    const lim = best.d + 0.5;
+    const near = [];
+    for (const [from, to] of [[best.oi, best.oj], [best.oj, best.oi]]) for (const c of from) {
+      if (toOutDist(c, to) > lim) continue;
+      near.push(c, footOn(c, to));   // the vertex and the point of the other piece's wall facing it
+    }
+    const h = hull(near);
+    if (h.length < 3) return { ok: false, gap: best.d };
+    worst = Math.max(worst, best.d);
+    const ring = h.map(p => [p[0] / k[0], p[1] / k[1]]); ring.push(ring[0]);
+    let u;
+    try { u = pc.union(cur[best.i], cur[best.j], [[ring]]); } catch (e) { return { ok: false, gap: best.d }; }
+    if (u.length > 1) return { ok: false, gap: best.d };
+    cur = cur.filter((_, x) => x !== best.i && x !== best.j).concat(u);
+  }
+  return { ok: true, out: cur, gap: worst };
+}
+
+async function mergeRooms() {
+  if (!edit || edit.multi.length < 2) return;
+  const msg = document.getElementById('edit-msg'), keys = edit.multi.slice();
+  let pc;
+  try { pc = await loadClipper(); } catch (e) { msg.textContent = tl('{message}. Check your network connection.', { message: e.message }); return; }
+  if (!edit || edit.multi.join() !== keys.join()) return;   // the selection changed while loading
+  const geoms = keys.map(k => clone(workingGeometry(k)));
+  snapNearVertices(geoms);
+  let out;
+  try { out = pc.union(...geoms.map(polysOf)); } catch (e) { msg.textContent = tl('Could not merge: {message}', { message: e.message }); return; }
+  if (!out.length) { msg.textContent = tl('Could not merge (the shape came out empty).'); return; }
+  let bridged = 0;
+  if (out.length > 1) {
+    const r = bridgeGaps(pc, out);
+    if (!r.ok) { msg.textContent = r.far ? tl('The selected rooms are {gap} m apart and cannot be merged (gaps up to {max} m are bridged).', { gap: r.gap.toFixed(1), max: MERGE_GAP_MAX_M }) : tl('Could not bridge the gap between the selected rooms ({gap} m): no facing walls found.', { gap: r.gap.toFixed(1) }); return; }
+    out = r.out; bridged = r.gap;
+    if (out.length > 1) { msg.textContent = tl('Could not join the selected rooms (the gap was not filled).'); return; }
+  }
+  const k = [111320 * Math.cos(out[0][0][0][1] * Math.PI / 180), 110540];
+  const poly = out[0].map(r => simplifyRing(r, k));
+  pushUndo();
+  const target = keys[0], tsh = edit.shapes[target] || touch(target);
+  const f = floorRooms().find(r => roomKey(r) === target);
+  tsh.geometry = { type: 'Polygon', coordinates: poly };
+  tsh.merged = true;
+  tsh.name = tsh.name || (f && f.properties.name) || tl('New room');
+  tsh.category = tsh.category || (f && f.properties.category) || 'other';
+  for (const key of keys.slice(1)) {
+    if (edit.shapes[key] && edit.shapes[key].state === 'new') delete edit.shapes[key];
+    else touch(key).state = 'del';
+  }
+  edit.multi = []; edit.sel = target; edit.vsel = null;
+  msg.textContent = tl('Merged {n} rooms into "{name}".', { n: keys.length, name: tsh.name }) + (bridged ? tl('Separated parts were joined by bridging a gap of up to {gap} m. ', { gap: bridged.toFixed(1) }) : '') + tl('You can change the name and category in the fields above.');
+  renderEdit();
+}
+
+// ---- aligning several rooms to the first one selected (the reference): edges, widths, and walls that face each other.
+// Works in metres on the reference's axes (its longest edge, folded to +-45 deg), so a tilted building aligns along its own walls.
+const ALIGN_EXT_M = 0.5, GAP_PARALLEL = Math.sin(3 * Math.PI / 180), GAP_OVERLAP_M = 0.5, TJ_M = 0.02;
+function alignFrame(g) {
+  const ring = polysOf(g)[0][0], lon0 = ring[0][0], lat0 = ring[0][1];
+  const k = [111320 * Math.cos(lat0 * Math.PI / 180), 110540];
+  let best = 0, ang = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const dx = (ring[i + 1][0] - ring[i][0]) * k[0], dy = (ring[i + 1][1] - ring[i][1]) * k[1], l = Math.hypot(dx, dy);
+    if (l > best) { best = l; ang = Math.atan2(dy, dx) * 180 / Math.PI; }
+  }
+  ang = ((ang % 90) + 90) % 90; if (ang > 45) ang -= 90;
+  const t = ang * Math.PI / 180;
+  return { lon0, lat0, k, u: [Math.cos(t), Math.sin(t)], v: [-Math.sin(t), Math.cos(t)] };
+}
+const toM = (fr, g) => polysOf(g).map(poly => poly.map(r => r.slice(0, -1).map(c => [(c[0] - fr.lon0) * fr.k[0], (c[1] - fr.lat0) * fr.k[1]])));
+const fromM = (fr, polys) => {
+  const cs = polys.map(poly => poly.map(r => { const o = r.map(m => [m[0] / fr.k[0] + fr.lon0, m[1] / fr.k[1] + fr.lat0]); return [...o, o[0]]; }));
+  return cs.length === 1 ? { type: 'Polygon', coordinates: cs[0] } : { type: 'MultiPolygon', coordinates: cs };
+};
+const axisVal = (fr, axis, p) => p[0] * fr[axis][0] + p[1] * fr[axis][1];
+function ringArea(r) { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+function polysOk(polys) {   // every ring simple, every outline at least 0.5 m2
+  return polys.every(poly => poly.every((r, ri) => {
+    if (r.length < 3 || (ri === 0 && Math.abs(ringArea(r)) < 0.5)) return false;
+    for (let i = 0; i < r.length; i++) for (let j = i + 2; j < r.length; j++) {
+      if (i === 0 && j === r.length - 1) continue;
+      if (segCross(r[i], r[(i + 1) % r.length], r[j], r[(j + 1) % r.length], 0.01)) return false;
+    }
+    return true;
+  }));
+}
+function extentOf(fr, polys, axis) {
+  const vs = polys.flatMap(poly => poly[0].map(p => axisVal(fr, axis, p)));
+  return { min: Math.min(...vs), max: Math.max(...vs) };
+}
+// Moves the vertices lying on one end of the outline (within 50 cm of the extreme) so that end sits at `target` along `axis`.
+function moveEnd(fr, polys, axis, end, target) {
+  const ext = extentOf(fr, polys, axis), e = ext[end];
+  if (Math.abs(target - e) < 1e-4) return false;
+  if (end === 'max' ? target - ext.min < 0.3 : ext.max - target < 0.3) return 'bad';   // would run past the opposite end
+  for (const poly of polys) for (const p of poly[0]) {
+    const d = axisVal(fr, axis, p);
+    if (Math.abs(d - e) <= ALIGN_EXT_M) { p[0] += (target - d) * fr[axis][0]; p[1] += (target - d) * fr[axis][1]; }
+  }
+  return true;
+}
+// Edges that face each other across a gap (< 1.5 m) and are parallel: the later room's edge goes onto the reference's line;
+// between two other rooms both move half way.
+function closeGaps(fr, rooms, gapM) {
+  let far = Infinity;   // nearest facing wall that was too far away
+  const out = (r, a, b, sgn) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [sgn * (b[1] - a[1]) / l, -sgn * (b[0] - a[0]) / l]; };
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < rooms.length; i++) for (let j = i + 1; j < rooms.length; j++) {
+      for (const pa of rooms[i].polys) for (const pb of rooms[j].polys) {
+        const A = pa[0], B = pb[0], sa = Math.sign(ringArea(A)) || 1, sb = Math.sign(ringArea(B)) || 1;
+        for (let p = 0; p < A.length; p++) for (let q = 0; q < B.length; q++) {
+          const a = A[p], b = A[(p + 1) % A.length], c = B[q], d = B[(q + 1) % B.length];
+          const L = Math.hypot(b[0] - a[0], b[1] - a[1]), M = Math.hypot(d[0] - c[0], d[1] - c[1]);
+          if (L < 0.1 || M < 0.1) continue;
+          const t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], n = [-t[1], t[0]];
+          if (Math.abs(t[0] * (d[1] - c[1]) / M - t[1] * (d[0] - c[0]) / M) > GAP_PARALLEL) continue;
+          const oa = out(0, a, b, sa), ob = out(0, c, d, sb);
+          if (oa[0] * ob[0] + oa[1] * ob[1] > -0.9) continue;                      // must face each other
+          const dc = (c[0] - a[0]) * n[0] + (c[1] - a[1]) * n[1], dd = (d[0] - a[0]) * n[0] + (d[1] - a[1]) * n[1], dist = (dc + dd) / 2;
+          if (Math.abs(dc - dd) > 0.15 || Math.abs(dist) < 0.005) continue;
+          const s1 = (c[0] - a[0]) * t[0] + (c[1] - a[1]) * t[1], s2 = (d[0] - a[0]) * t[0] + (d[1] - a[1]) * t[1];
+          if (Math.min(L, Math.max(s1, s2)) - Math.max(0, Math.min(s1, s2)) < Math.min(GAP_OVERLAP_M, L / 2, M / 2)) continue;
+          if (Math.abs(dist) > gapM) { far = Math.min(far, Math.abs(dist)); continue; }
+          // The meeting line: the reference's own wall, or half way between two others. Every moved end is put exactly on it
+          // (not just shifted), so walls that were a hair off parallel end up as one straight line and do not cross.
+          const [la, lb, ln] = i === 0 ? [a, b, n] : j === 0 ? [c, d, [-(d[1] - c[1]) / M, (d[0] - c[0]) / M]]
+            : [[a[0] + n[0] * dist / 2, a[1] + n[1] * dist / 2], null, n];
+          const off = ln[0] * la[0] + ln[1] * la[1];
+          for (const [pt, moves] of [[a, i !== 0], [b, i !== 0], [c, j !== 0], [d, j !== 0]]) {
+            if (!moves) continue;
+            const sh = off - (ln[0] * pt[0] + ln[1] * pt[1]);
+            pt[0] += sh * ln[0]; pt[1] += sh * ln[1];
+          }
+        }
+      }
+    }
+  }
+  return far;
+}
+// A vertex of one room that lies on a straight stretch of another room's wall becomes a vertex of that wall too.
+function addTJunctions(rooms) {
+  for (const ra of rooms) for (const rb of rooms) {
+    if (ra === rb) continue;
+    for (const pa of ra.polys) for (const pt of pa.flat()) for (const pb of rb.polys) for (const ring of pb) {
+      for (let q = 0; q < ring.length; q++) {
+        const c = ring[q], d = ring[(q + 1) % ring.length];
+        if (distToSeg(pt, c, d) < TJ_M && Math.hypot(pt[0] - c[0], pt[1] - c[1]) > 0.03 && Math.hypot(pt[0] - d[0], pt[1] - d[1]) > 0.03) { ring.splice(q + 1, 0, [pt[0], pt[1]]); break; }
+      }
+    }
+  }
+}
+const ALIGN_LABEL = { left: tl('Align left'), right: tl('Align right'), top: tl('Align top'), bottom: tl('Align bottom'), width: tl('Width match'), height: tl('Height match'), gap: tl('Close up walls') };
+function alignRooms(mode) {
+  if (!edit || edit.multi.length < 2) return;
+  const msg = document.getElementById('edit-msg'), keys = edit.multi.slice();
+  const fr = alignFrame(workingGeometry(keys[0]));
+  const rooms = keys.map(key => ({ key, before: workingGeometry(key), polys: toM(fr, workingGeometry(key)) }));
+  const ref = rooms[0], U = extentOf(fr, ref.polys, 'u'), V = extentOf(fr, ref.polys, 'v');
+  const moved = new Set(), bad = [], ok = [];
+  let far = Infinity;
+  if (mode === 'gap') {
+    const snapshot = JSON.stringify(rooms.map(r => r.polys));
+    const gapM = +document.getElementById('edit-gap').value || 3;
+    far = closeGaps(fr, rooms, gapM);
+    addTJunctions(rooms);
+    rooms.forEach((r, i) => { if (JSON.stringify(r.polys) !== JSON.stringify(JSON.parse(snapshot)[i])) moved.add(r.key); });
+  } else {
+    for (const r of rooms.slice(1)) {
+      const e = extentOf(fr, r.polys, mode === 'width' || mode === 'left' || mode === 'right' ? 'u' : 'v');
+      const did = mode === 'left' ? moveEnd(fr, r.polys, 'u', 'min', U.min)
+        : mode === 'right' ? moveEnd(fr, r.polys, 'u', 'max', U.max)
+        : mode === 'top' ? moveEnd(fr, r.polys, 'v', 'max', V.max)
+        : mode === 'bottom' ? moveEnd(fr, r.polys, 'v', 'min', V.min)
+        : mode === 'width' ? moveEnd(fr, r.polys, 'u', 'max', e.min + (U.max - U.min))
+        : moveEnd(fr, r.polys, 'v', 'max', e.min + (V.max - V.min));
+      if (did === 'bad') bad.push(r); else if (did) moved.add(r.key);
+    }
+  }
+  for (const r of rooms) {
+    if (!moved.has(r.key)) continue;
+    (polysOk(r.polys) ? ok : bad).push(r);
+  }
+  if (!ok.length) {
+    msg.textContent = bad.length ? tl('{rooms}: not applied for {mode}, because moving would break the shape (cross the opposite edge).', { rooms: bad.map(r => roomLabel(r.key)).join(JOIN), mode: ALIGN_LABEL[mode] })
+      : mode === 'gap' ? tl('No walls to close up were found. ') + (far < Infinity ? tl('The facing walls are {gap} m apart. Raise the "Gap" limit on the right.', { gap: far.toFixed(1) }) : tl('Facing parallel walls (running side by side for 0.5 m or more) are needed.')) : tl('Already aligned.');
+    return;
+  }
+  pushUndo();
+  for (const r of ok) touch(r.key).geometry = fromM(fr, r.polys);
+  msg.textContent = tl('{mode}: moved {rooms}.', { mode: ALIGN_LABEL[mode], rooms: ok.map(r => roomLabel(r.key)).join(JOIN) })
+    + (bad.length ? tl(' {rooms}: left as it is, because moving would break the shape.', { rooms: bad.map(r => roomLabel(r.key)).join(JOIN) }) : '');
+  renderEdit();
+}
+
+function drawAnchors(pts) {
+  return pts.length >= 2 ? [{ a: pts[pts.length - 2], b: pts[pts.length - 1] }, { a: pts[1], b: pts[0] }] : [];
+}
+
+function drawClick(e) {
+  const pts = edit.drawing;
+  if (pts.length >= 3) {
+    const s = map.project(pts[0]);
+    if (Math.hypot(s.x - e.point.x, s.y - e.point.y) < 10) return finishDrawing();
+  }
+  // A new edge is perpendicular to the previous one; the last edge also to the first one (closing a rectangle).
+  const anchors = drawAnchors(pts);
+  pts.push(e.originalEvent.altKey ? [e.lngLat.lng, e.lngLat.lat] : snapTo(e.point, e.lngLat, null, anchors));
+  edit.guide = null;
+  renderEdit();
+}
+
+function startDrawing() {
+  if (!edit || edit.drawing) return;
+  edit.drawing = []; edit.vsel = null; edit.walls = null;
+  map.doubleClickZoom.disable();
+  map.getCanvas().style.cursor = 'crosshair';
+  renderEdit();
+}
+function endDrawing() {
+  edit.drawing = null; edit.walls = null; edit.guide = null;
+  map.doubleClickZoom.enable();
+  map.getCanvas().style.cursor = '';
+}
+function finishDrawing() {
+  const pts = edit.drawing;
+  if (!pts || pts.length < 3) return;
+  const ring = [...pts, pts[0]];
+  const area = ring.slice(0, -1).reduce((s, p, k) => s + (p[0] * ring[k + 1][1] - ring[k + 1][0] * p[1]), 0);
+  if (area < 0) ring.reverse();   // exterior rings counter-clockwise
+  pushUndo();
+  const key = `new-${edit.nextNew++}`;
+  edit.shapes[key] = { state: 'new', geometry: { type: 'Polygon', coordinates: [ring] }, name: '', category: 'other' };
+  edit.sel = key; select(null);
+  endDrawing();
+  edit.tool = 'select';
+  renderEdit();
+  document.getElementById('edit-msg').textContent = tl('Added a new room (green). Enter a name and category. Click its entry in the list to come back to it any time.');
+  document.getElementById('edit-new-name').focus();
+}
+
+
+// ---- toolbar: one tool at a time (geojson.io style). select = vertices; polygon / rect = draw a room; transform = move /
+// rotate / scale the selected rooms; map = move the floor's source map (the position controls of the side panel).
+function setTool(t) {
+  if (!edit) return;
+  if (edit.tool === t && t !== 'select') t = 'select';
+  if (t === 'map' && (!LIVE || !basemapFor(edit.level))) { document.getElementById('edit-msg').textContent = tl('This floor has no floor map.'); return; }
+  if (edit.drawing) endDrawing();
+  edit.rect = null; edit.preview = null; edit.guide = null; edit.walls = null; edit.vsel = null;
+  if (edit.tool === 'map' && t !== 'map') setNudgeDrag(false);
+  edit.tool = t;
+  map.dragPan.enable();
+  map.getCanvas().style.cursor = '';
+  if (t === 'polygon') startDrawing();
+  else if (t === 'rect') map.getCanvas().style.cursor = 'crosshair';
+  else if (t === 'map') {
+    if (!view.showMap) { const cb = document.getElementById('show-map'); cb.checked = true; cb.onchange(); }   // the floor map has to be visible
+    syncNudgeUI();
+    setNudgeDrag(true);
+  }
+  renderEdit();
+}
+
+// ---- rectangle: two opposite corners (click, click) or a drag; screen-aligned like geojson.io's
+function rectRing(a, b) {
+  const pa = map.project(a), pb = map.project(b);
+  const c = [[pa.x, pa.y], [pb.x, pa.y], [pb.x, pb.y], [pa.x, pb.y]].map(q => { const ll = map.unproject(q); return [ll.lng, ll.lat]; });
+  return [...c, c[0]];
+}
+const rectPoint = (e) => e.originalEvent.altKey ? [e.lngLat.lng, e.lngLat.lat] : snapTo(e.point, e.lngLat, null, null);
+function rectDown(e) {
+  if (!edit || edit.tool !== 'rect' || edit.rect) return;
+  e.preventDefault();
+  edit.walls = null;
+  edit.rect = { a: rectPoint(e), from: e.point, drag: true };
+  edit.guide = null;
+  map.dragPan.disable();
+}
+function rectMove(e) {
+  if (!edit || edit.tool !== 'rect' || !edit.rect) return;
+  edit.preview = rectRing(edit.rect.a, rectPoint(e));
+  renderEdit();
+}
+function rectUp(e) {
+  if (!edit || edit.tool !== 'rect' || !edit.rect || !edit.rect.drag) return;
+  map.dragPan.enable();
+  edit.suppressClick = true;
+  setTimeout(() => { if (edit) edit.suppressClick = false; }, 0);   // the click that follows a mouseup must not count again
+  if (Math.hypot(e.point.x - edit.rect.from.x, e.point.y - edit.rect.from.y) > 6) return finishRect(rectPoint(e));
+  edit.rect.drag = false;   // a plain click: the first corner is set, the next click sets the opposite one
+}
+function rectClick(e) {
+  if (edit.rect && !edit.rect.drag) finishRect(rectPoint(e));
+}
+function finishRect(b) {
+  const a = edit.rect.a, pa = map.project(a), pb = map.project(b);
+  edit.rect = null; edit.preview = null; edit.guide = null;
+  if (Math.abs(pa.x - pb.x) < 4 || Math.abs(pa.y - pb.y) < 4) return renderEdit();   // too small: nothing drawn
+  edit.drawing = rectRing(a, b).slice(0, 4);
+  finishDrawing();
+}
+
+// ---- transform: move / rotate / scale the selected rooms together (frame = their bounding box in east/north)
+function xformKeys() {
+  if (!edit) return [];
+  const ks = edit.multi.length >= 2 ? edit.multi : edit.sel ? [edit.sel] : [];
+  return ks.filter(k => { const s = edit.shapes[k]; return !(s && s.state === 'del') && workingGeometry(k); });
+}
+function xformHandles() {
+  const keys = xformKeys();
+  let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+  for (const k of keys) polysOf(workingGeometry(k)).forEach(poly => poly.forEach(ring => ring.forEach(([x, y]) => {
+    w = Math.min(w, x); e = Math.max(e, x); s = Math.min(s, y); n = Math.max(n, y);
+  })));
+  if (!keys.length || !isFinite(w)) return null;
+  const C = [[w, n], [e, n], [e, s], [w, s]], top = [(w + e) / 2, n];
+  const mid = map.project([(w + e) / 2, (n + s) / 2]), t = map.project(top);
+  let dx = t.x - mid.x, dy = t.y - mid.y;
+  const l = Math.hypot(dx, dy);
+  if (l < 1) { dx = 0; dy = -1; } else { dx /= l; dy /= l; }
+  const rp = map.unproject([t.x + dx * 30, t.y + dy * 30]);   // the rotate handle sits 30 px outside the top edge
+  return { keys, b: { w, s, e, n }, C, top, rot: [rp.lng, rp.lat] };
+}
+function renderXform() {
+  const src = map.getSource('edit-xform');
+  if (!src) return;
+  const h = edit && edit.tool === 'transform' && !edit.drawing ? xformHandles() : null;
+  if (!h) return src.setData(emptyFC());
+  const pt = (c, props) => ({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: c } });
+  src.setData({ type: 'FeatureCollection', features: [
+    { type: 'Feature', properties: { kind: 'frame' }, geometry: { type: 'LineString', coordinates: [...h.C, h.C[0]] } },
+    { type: 'Feature', properties: { kind: 'stem' }, geometry: { type: 'LineString', coordinates: [h.top, h.rot] } },
+    ...h.C.map((c, idx) => pt(c, { kind: 'corner', idx })), pt(h.rot, { kind: 'rotate' })] });
+}
+function xformHover(e) {
+  const h = xformHandles();
+  if (!h) { map.getCanvas().style.cursor = ''; return; }
+  const hit = map.queryRenderedFeatures(e.point, { layers: ['edit-xform-handle'] })[0];
+  const inside = e.lngLat.lng >= h.b.w && e.lngLat.lng <= h.b.e && e.lngLat.lat >= h.b.s && e.lngLat.lat <= h.b.n;
+  map.getCanvas().style.cursor = hit ? (hit.properties.kind === 'rotate' ? 'grab' : 'nwse-resize') : inside ? 'move' : '';
+}
+const mapCoords = (c, fn) => typeof c[0] === 'number' ? fn(c) : c.map(x => mapCoords(x, fn));
+function xformDown(e) {
+  if (!edit || edit.tool !== 'transform' || edit.drawing) return;
+  const h = xformHandles();
+  if (!h) return;
+  const hit = map.queryRenderedFeatures(e.point, { layers: ['edit-xform-handle'] })[0];
+  const inside = e.lngLat.lng >= h.b.w && e.lngLat.lng <= h.b.e && e.lngLat.lat >= h.b.s && e.lngLat.lat <= h.b.n;
+  if (!hit && !inside) return;
+  e.preventDefault();
+  const mode = hit ? (hit.properties.kind === 'rotate' ? 'rotate' : 'scale') : 'move';
+  const orig = h.keys.map(k => [k, clone(workingGeometry(k))]);
+  const lon0 = (h.b.w + h.b.e) / 2, lat0 = (h.b.s + h.b.n) / 2;
+  const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
+  const M = (p) => [(p[0] - lon0) * kx, (p[1] - lat0) * ky];                       // lng/lat -> metres from the frame's centre
+  const P = (m, p) => [lon0 + m[0] / kx, lat0 + m[1] / ky, ...p.slice(2)];
+  const corner = hit && hit.properties.kind === 'corner' ? hit.properties.idx : null;
+  const pivot = mode === 'scale' ? M(h.C[(corner + 2) % 4]) : [0, 0];               // scale about the opposite corner
+  const grab = mode === 'rotate' ? M(h.rot) : mode === 'scale' ? M(h.C[corner]) : M([e.lngLat.lng, e.lngLat.lat]);
+  let moved = false;
+  edit.drag = { moved: false, from: e.point };
+  edit.vsel = null;
+  map.dragPan.disable();
+  map.getCanvas().style.cursor = mode === 'move' ? 'move' : mode === 'rotate' ? 'grabbing' : 'nwse-resize';
+  const msg = document.getElementById('edit-msg');
+  const move = (ev) => {
+    if (!moved && Math.hypot(ev.point.x - e.point.x, ev.point.y - e.point.y) < 3) return;
+    if (!moved) { moved = true; edit.drag.moved = true; pushUndo(); }
+    const cur = M([ev.lngLat.lng, ev.lngLat.lat]);
+    let fn;
+    if (mode === 'move') {
+      const d = [cur[0] - grab[0], cur[1] - grab[1]];
+      fn = (p) => { const m = M(p); return P([m[0] + d[0], m[1] + d[1]], p); };
+      msg.textContent = tl('Move: east {east} m / north {north} m', { east: d[0].toFixed(2), north: d[1].toFixed(2) });
+    } else if (mode === 'scale') {
+      const g = [grab[0] - pivot[0], grab[1] - pivot[1]], c = [cur[0] - pivot[0], cur[1] - pivot[1]];
+      const f = Math.max(0.05, Math.min(20, (c[0] * g[0] + c[1] * g[1]) / (g[0] * g[0] + g[1] * g[1] || 1)));
+      fn = (p) => { const m = M(p); return P([pivot[0] + f * (m[0] - pivot[0]), pivot[1] + f * (m[1] - pivot[1])], p); };
+      msg.textContent = tl('Scale: {pct}%', { pct: (f * 100).toFixed(1) });
+    } else {
+      let a = Math.atan2(cur[1], cur[0]) - Math.atan2(grab[1], grab[0]);
+      if (ev.originalEvent.shiftKey) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
+      const cs = Math.cos(a), sn = Math.sin(a);
+      fn = (p) => { const m = M(p); return P([cs * m[0] - sn * m[1], sn * m[0] + cs * m[1]], p); };
+      msg.textContent = tl('Rotation: {deg}° (counter-clockwise)', { deg: (a * 180 / Math.PI).toFixed(1) });
+    }
+    for (const [k, g0] of orig) touch(k).geometry = { type: g0.type, coordinates: mapCoords(g0.coordinates, fn) };
+    renderEdit();
+  };
+  const up = () => {
+    map.off('mousemove', move); map.off('mouseup', up);
+    map.dragPan.enable();
+    if (!edit) return;
+    edit.suppressClick = moved;   // a drag must not also count as a click that selects another room
+    setTimeout(() => { if (edit) edit.suppressClick = false; }, 0);
+    edit.drag = null;
+    map.getCanvas().style.cursor = '';
+    renderEdit();
+  };
+  map.on('mousemove', move); map.on('mouseup', up);
+}
+
+function deleteVertex() {
+  const v = edit && edit.vsel; if (!v) return;
+  const g = workingGeometry(v.key);
+  const ring = polysOf(g)[v.p][v.r];
+  if (ring.length <= 4) { document.getElementById('edit-msg').textContent = tl('Cannot remove more vertices (3 is the minimum). Delete the whole room instead.'); return; }
+  pushUndo();
+  const sh = touch(v.key);
+  const rg = polysOf(sh.geometry)[v.p][v.r];
+  rg.splice(v.i, 1);
+  rg[rg.length - 1] = rg[0];
+  edit.vsel = null;
+  renderEdit();
+}
+
+function deleteRoom() {
+  if (!edit || !edit.sel) return;
+  pushUndo();
+  const sh = edit.shapes[edit.sel];
+  if (sh && sh.state === 'new') { delete edit.shapes[edit.sel]; edit.sel = null; }
+  else { touch(edit.sel).state = 'del'; }
+  edit.vsel = null;
+  renderEdit();
+}
+
+async function saveEdit() {
+  const ops = [];
+  for (const [key, sh] of Object.entries(edit.shapes)) {
+    if (sh.state === 'del') ops.push({ op: 'delete', id: key });
+    else if (sh.state === 'mod') ops.push({ op: 'update', id: key, geometry: sh.geometry, ...(sh.merged || sh.attrs ? { name: (sh.name || '').trim() || undefined, category: sh.category } : {}) });
+    else ops.push({ op: 'add', name: (sh.name || '').trim() || tl('New room'), category: sh.category || 'other', geometry: sh.geometry });
+  }
+  if (!ops.length) return;
+  if ((edit.overlaps || []).length && !confirm(tl('{n} pairs of rooms overlap. The room listed first in the plan keeps the overlap and the later one is cut. Save anyway?', { n: edit.overlaps.length }))) return;
+  const msg = document.getElementById('edit-msg'), btn = document.getElementById('edit-save');
+  btn.disabled = true; btn.textContent = tl('Applying…');
+  let report;
+  try {
+    const res = await fetch('/room-edits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: edit.level, ops }) });
+    report = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
+  } catch (e) { report = { ok: false, error: tl('{message}. Check that the preview server is running', { message: e.message }) }; }
+  btn.textContent = tl('Save & apply');
+  if (!report.ok) {
+    btn.disabled = false;
+    msg.textContent = tl('Could not apply: {error}', { error: report.error || (report.build && (report.build.error || JSON.stringify(report.build.errors))) || tl('unknown error') });
+    return;
+  }
+  const lv = levels().find(l => l.level === edit.level);
+  const count = (k) => ops.filter(o => o.op === k).length;
+  const parts = [['update', tl('Changed')], ['add', tl('Added')], ['delete', tl('Deleted')]].filter(([k]) => count(k)).map(([k, t]) => `${t} ${count(k)}`);
+  const added = (report.applied || []).filter(a => a.op === 'add').map(a => ({ id: a.id, name: a.name }));
+  const level = edit.level;
+  stopEdit();
+  if (added.length) { pendingFocus = { level, rooms: added }; applyFocus(false); setTimeout(() => applyFocus(true), 4000); }
+  log(tl('Edited the room shapes of {floor} by hand ({parts})', { floor: esc(lv ? lv.name : ''), parts: parts.join(' / ') })
+      + ((report.warnings || []).length ? `<br>${tl('Note: ')}${report.warnings.map(esc).join(' / ')}` : ''));
+}
+
+// geojson.io round trip: GET /floor-export downloads the floor's rooms; the edited file goes to POST /floor-import
+// (a dry run first, so the counts can be confirmed).
+async function gioExport() {
+  const msg = document.getElementById('gio-msg');
+  if (currentLevel === null) { msg.textContent = tl('Pick a floor first.'); return; }
+  const res = await fetch(`/floor-export?level=${currentLevel}`);
+  if (!res.ok) { msg.textContent = tl('Could not export: {error}', { error: (await res.json().catch(() => ({}))).error || res.status }); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(await res.blob());
+  a.download = (res.headers.get('Content-Disposition') || '').match(/filename="(.+)"/)?.[1] || `floor-${currentLevel}.geojson`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  msg.textContent = tl('Saved {file}. Open it in geojson.io (https://geojson.io), edit it, and bring the saved GeoJSON back with Import.', { file: a.download });
+}
+
+async function gioImport(file) {
+  const msg = document.getElementById('gio-msg');
+  if (edit && Object.keys(edit.shapes).length) { msg.textContent = tl('There are unsaved room edits. Save them with "Save & apply", or redo the edits, before importing.'); return; }
+  const text = await file.text();
+  const post = async (q) => {
+    try {
+      const res = await fetch('/floor-import' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: text });
+      return await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
+    } catch (e) { return { ok: false, error: tl('{message}. Check that the preview server is running', { message: e.message }) }; }
+  };
+  msg.textContent = tl('Checking the changes…');
+  const dry = await post('?dry=1');
+  if (!dry.ok) { msg.textContent = tl('Could not import: {error}', { error: dry.error || tl('unknown error') }); return; }
+  const s = dry.summary;
+  if (!s.update && !s.add && !s.delete) { msg.textContent = tl('There were no changes.'); return; }
+  const text2 = tl('{u} changed / {a} added / {d} deleted', { u: s.update, a: s.add, d: s.delete });
+  if (!confirm(tl('Apply {summary}? (Tell Claude "undo" to revert)', { summary: text2 }))) { msg.textContent = tl('Import cancelled.'); return; }
+  msg.textContent = tl('Applying…');
+  const report = await post('');
+  if (!report.ok) { msg.textContent = tl('Could not apply: {error}', { error: report.error || (report.build && (report.build.error || JSON.stringify(report.build.errors))) || tl('unknown error') }); return; }
+  msg.textContent = tl('Applied ({summary}).', { summary: text2 });
+  log(tl('Imported room shapes edited in geojson.io ({summary})', { summary: esc(text2) })
+      + ((report.warnings || []).length ? `<br>${tl('Note: ')}${report.warnings.map(esc).join(' / ')}` : ''));
+}
+
+function bindEdit() {
+  const $ = (id) => document.getElementById(id);
+  $('gio-export').onclick = gioExport;
+  $('gio-import').onclick = () => $('gio-file').click();
+  $('gio-file').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) gioImport(f); };
+  $('edit-start').onclick = startEdit;
+  $('edit-cancel').onclick = () => {
+    if (edit && (Object.keys(edit.shapes).length || nudgeActive(nudge.level)) && !confirm(tl('Discard the unsaved edits (room shapes, floor map position)?'))) return;
+    stopEdit();
+  };
+  for (const t of document.querySelectorAll('#redit .tab')) t.onclick = () => {
+    for (const o of document.querySelectorAll('#redit .tab')) o.classList.toggle('on', o === t);
+    $('tab-json').hidden = t.dataset.tab !== 'json'; $('tab-table').hidden = t.dataset.tab !== 'table';
+  };
+  for (const t of document.querySelectorAll('#flist .tab')) t.onclick = () => {
+    for (const o of document.querySelectorAll('#flist .tab')) o.classList.toggle('on', o === t);
+    for (const pg of document.querySelectorAll('#flist .vpage')) pg.hidden = pg.id !== `vtab-${t.dataset.vtab}`;
+  };
+  const opts = $('view-opts');   // the 表示 section: open / closed is remembered
+  opts.open = store.get('view-opts') !== 'closed';
+  opts.ontoggle = () => store.set('view-opts', opts.open ? 'open' : 'closed');
+  $('toggle-l').onclick = () => { document.body.classList.toggle('show-l'); document.body.classList.remove('show-r'); };
+  $('toggle-r').onclick = () => { document.body.classList.toggle('show-r'); document.body.classList.remove('show-l'); };
+  $('json-text').oninput = (e) => {   // valid JSON is applied after a short pause, like geojson.io
+    clearTimeout(jsonApplyTimer);
+    jsonApplyTimer = setTimeout(() => { $('json-err').textContent = (edit && applyJson(e.target.value)) || ''; }, 500);
+  };
+  $('json-text').onblur = () => {   // apply what is pending, then show the canonical text again
+    if (!edit) return;
+    clearTimeout(jsonApplyTimer);
+    const err = applyJson($('json-text').value);
+    $('json-err').textContent = err || '';
+    if (!err) $('json-text').value = floorJson();
+  };
+  $('edit-undo').onclick = undoEdit;
+  $('edit-save').onclick = saveEdit;
+  $('edit-del-room').onclick = () => { if (edit && edit.vsel) deleteVertex(); else deleteRoom(); };
+  for (const b of document.querySelectorAll('#edit-tools [data-tool]')) b.onclick = () => setTool(b.dataset.tool);
+  for (const b of document.querySelectorAll('#edit-mode [data-mode]')) b.onclick = () => {
+    if (!edit) return;
+    if (b.dataset.mode === 'map') { if (edit.tool !== 'map') setTool('map'); } else if (edit.tool === 'map') setTool('select');
+  };
+  $('edit-merge').onclick = mergeRooms;
+  for (const b of document.querySelectorAll('#edit-align [data-align]')) b.onclick = () => alignRooms(b.dataset.align);
+  $('edit-finish').onclick = finishDrawing;
+  $('edit-new-name').oninput = (e) => { const sh = edit && edit.shapes[edit.sel]; if (sh && (sh.state === 'new' || sh.merged)) { sh.name = e.target.value; renderEdit(); } };
+  $('edit-new-category').onclick = (e) => openCatMenu(e.currentTarget, e.currentTarget.dataset.val, (c) => {
+    const sh = edit && edit.shapes[edit.sel];
+    if (sh && (sh.state === 'new' || sh.merged)) { sh.category = c; renderEdit(); }
+  });
+  document.addEventListener('mousedown', (e) => { if (!e.target.closest('#cat-menu, .catbtn')) closeCatMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCatMenu(); });
+  document.addEventListener('keydown', (e) => {
+    if (!edit || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoEdit(); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); if (edit.vsel) deleteVertex(); else if (edit.sel && !edit.drawing) deleteRoom(); }
+    else if (e.key === 'Enter' && edit.drawing) finishDrawing();
+    else if (e.key === 'Escape') {
+      if (edit.drawing) { endDrawing(); edit.tool = 'select'; renderEdit(); } else if (edit.rect) { edit.rect = null; edit.preview = null; renderEdit(); }
+      else if (edit.multi.length) { edit.multi = []; renderEdit(); } else if (edit.vsel) { edit.vsel = null; renderEdit(); }
+      else if (edit.tool !== 'select') setTool('select');
+    }
+  });
+}
+
+function log(html) {
+  const ul = document.getElementById('log');
+  if (ul.querySelector('.empty')) ul.innerHTML = '';
+  const li = document.createElement('li');
+  li.innerHTML = `<time>${new Date().toLocaleTimeString()}</time>${html}`;
+  ul.prepend(li);
+}
+
+function describe(ch) {
+  const parts = [];
+  if (ch.added.length) parts.push(tl('added {n}', { n: ch.added.length }));
+  if (ch.changed.length) parts.push(tl('changed {n}', { n: ch.changed.length }));
+  if (ch.removed.length) parts.push(tl('deleted {n}', { n: ch.removed.length }));
+  const names = [...ch.added, ...ch.changed.map(c => c.id)].slice(0, 4)
+    .map(id => (feature(id) || { properties: { name: id } }).properties.name);
+  return (parts.join(' / ') || tl('No changes')) + (names.length ? tl(': {names}', { names: names.map(esc).join(JOIN) }) : '');
+}
+
+// After saving, go to the rooms that were added: select the first and fly to it (or say why it is missing).
+let pendingFocus = null;
+function applyFocus(final) {
+  if (!pendingFocus) return;
+  const { level, rooms } = pendingFocus;
+  const found = rooms.map(r => data.features.find(f => isRoomFeature(f) && f.properties.level === level && f.properties.room_id === r.id)).filter(Boolean);
+  if (found.length) {
+    pendingFocus = null;
+    select(found[0].properties.id);
+    highlight.changed = found.map(f => f.properties.id); updateHighlight();
+    setTimeout(() => { highlight.changed = []; updateHighlight(); }, 8000);
+    showGeometry(found[0].geometry);
+    log(tl('Added rooms: {names} (selected on the map)', { names: found.map(f => esc(f.properties.name)).join(JOIN) }));
+  } else if (final) {
+    pendingFocus = null;
+    log(tl('The added rooms ({names}) did not survive the build. They may have overlapped other rooms listed earlier.', { names: rooms.map(r => esc(r.name)).join(JOIN) }));
+  }
+}
+
+async function reload(changes) {
+  const res = await fetch(`indoor.geojson?t=${Date.now()}`);
+  data = await res.json();
+  map.getSource('indoor').setData(data);      // camera and floor stay where the user left them
+  if (selectedId && !feature(selectedId)) selectedId = null;
+  renderUI(); applyFilters();
+  syncBasemaps().catch(console.error);
+  loadCost();
+  applyFocus(false);
+  if (!changes) return;
+  log(describe(changes));
+  const ids = [...changes.added, ...changes.changed.map(c => c.id)].filter(id => feature(id));
+  highlight.changed = ids;
+  updateHighlight();
+  setTimeout(() => { highlight.changed = []; updateHighlight(); }, 4000);
+}
+
+// Seconds -> "1時間5分" / "12分" / "40秒".
+function fmtDuration(s) {
+  if (s < 60) return tl('{s}s', { s: Math.round(s) });
+  const m = Math.round(s / 60);
+  return m < 60 ? tl('{m}m', { m }) : tl('{h}h {m}m', { h: Math.floor(m / 60), m: m % 60 });
+}
+
+// Claude usage spent on this building, estimated by the server from Claude Code's session logs.
+async function loadCost() {
+  let c;
+  try { c = await (await fetch(`cost.json?t=${Date.now()}`)).json(); } catch { return; }
+  const n = new Intl.NumberFormat(LANG === 'en' ? 'en-US' : 'ja-JP', { notation: 'compact', maximumFractionDigits: 1 });
+  const sum = (k) => Object.values(c.models || {}).reduce((s, m) => s + (m[k] || 0), 0);
+  document.getElementById('cost-usd').innerHTML = `$${c.usd.toFixed(2)}<small>${tl('at API list prices')}</small>`;
+  const lines = c.turns
+    ? [tl('{turns} turns / {sessions} sessions', { turns: c.turns, sessions: c.sessions.length }),
+       tl('Working time {time} ({from} – {to})', { time: fmtDuration(c.active_seconds || 0), from: esc((c.first || '').slice(0, 10)), to: esc((c.last || '').slice(0, 10)) }),
+       tl('Output {out} · cache read {read} · cache write {write} tokens', { out: n.format(sum('output')), read: n.format(sum('cache_read')), write: n.format(sum('cache_write_5m') + sum('cache_write_1h')) })]
+    : [tl('No work for this building is in the logs yet.')];
+  if (c.unpriced_models.length) lines.push(tl('Models without a price: {models}', { models: c.unpriced_models.map(esc).join(', ') }));
+  lines.push(tl('Tool development ({usd}) is not included. Prices as of {date}.', { usd: '$' + (c.development_usd || 0).toFixed(2), date: esc(c.prices_as_of) }));
+  document.getElementById('cost-detail').innerHTML = lines.join('<br>');
+  document.getElementById('cost').hidden = false;
+}
+
+function connect() {
+  const dot = document.getElementById('live-dot'), text = document.getElementById('live-text');
+  const es = new EventSource('/events');
+  es.addEventListener('hello', () => { dot.className = 'dot live'; text.textContent = tl('Live (updates apply automatically)'); });
+  es.addEventListener('update', (e) => reload(JSON.parse(e.data).changes).catch(console.error));
+  es.onerror = () => { dot.className = 'dot'; text.textContent = tl('Reconnecting…'); };
+}
+
+bindControls();
+bindNudge();
+bindEdit();
+start();
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "slug": "marubiru-sample",
+  "building": {
+    "name": "丸の内ビルディング（丸ビル）",
+    "source": { "type": "osm_id", "osm_type": "way", "osm_id": 145394394 },
+    "crs": "auto",
+    "orientation": "auto",
+    "total_floors": 37,
+    "basement_floors": 4
+  },
+  "provenance": {
+    "request": "手書きサンプル（東京駅前の丸ビル。低層は商業、上はオフィス）",
+    "sources": []
+  },
+  "defaults": { "floor_height": 4.0, "ceiling_gap": 0.3, "wall_gap": 0.4 },
+  "floors": [
+    { "level": -1, "name": "B1F", "height": 4.5, "rooms": [
+      { "id": "L-1-food", "name": "フードマーケット", "category": "retail", "side": "east", "ratio": 0.55, "confidence": "estimated" },
+      { "id": "L-1-service", "name": "バックヤード", "category": "service", "side": "rest", "confidence": "estimated" }
+    ]},
+    { "level": 1, "height": 6.0, "rooms": [
+      { "id": "L1-atrium", "name": "マルキューブ（吹抜）", "category": "hall", "side": "east", "ratio": 0.25, "confidence": "estimated" },
+      { "id": "L1-office-lobby", "name": "オフィスロビー", "category": "lobby", "side": "west", "ratio": 0.2, "confidence": "estimated" },
+      { "id": "L1-shops", "name": "ショップ", "category": "retail", "side": "rest", "subdivide": { "count": 4, "axis": "long" }, "confidence": "estimated" }
+    ]},
+    { "levels": [2, 3, 4], "height": 4.5, "rooms": [
+      { "id": "L2-shops-n", "name": "ショップ北", "category": "retail", "side": "north", "ratio": 0.45, "subdivide": { "count": 3 }, "confidence": "estimated" },
+      { "id": "L2-core", "name": "共用部・EV", "category": "circulation", "side": "west", "ratio": 0.15, "confidence": "estimated" },
+      { "id": "L2-shops-s", "name": "ショップ南", "category": "retail", "side": "rest", "subdivide": { "count": 3 }, "confidence": "estimated" }
+    ]},
+    { "levels": [5, 6], "height": 4.5, "rooms": [
+      { "id": "L5-restaurants", "name": "レストラン", "category": "restaurant", "side": "north", "ratio": 0.6, "subdivide": { "count": 4 }, "confidence": "estimated" },
+      { "id": "L5-core", "name": "共用部・EV", "category": "circulation", "side": "rest", "confidence": "estimated" }
+    ]},
+    { "levels": [7, 8, 9], "rooms": [
+      { "id": "L7-core", "name": "コア（EV・階段）", "category": "circulation", "side": "west", "ratio": 0.12, "confidence": "estimated" },
+      { "id": "L7-office", "name": "オフィス", "category": "office", "side": "rest", "confidence": "estimated" }
+    ]}
+  ]
+}

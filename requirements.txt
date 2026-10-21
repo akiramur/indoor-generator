@@ -5,3 +5,5 @@ jsonschema>=4.20
 svgelements>=1.9
 pytest>=8.0
 pillow>=10.0
+numpy>=1.26
+opencv-python-headless>=4.8

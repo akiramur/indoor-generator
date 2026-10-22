@@ -599,8 +599,11 @@ def cmd_basemap(args) -> int:
             from shapely.ops import unary_union
             zones = json.loads(Path(args.outline_trace).read_text())
             outline = unary_union([_Poly(z["px"]).buffer(0) for z in zones if z.get("px")]).convex_hull
+        if args.true_width_m is not None and args.true_width_m <= 0:
+            _print_json({"ok": False, "error": "--true-width-m must be a positive number of metres"})
+            return 1
         t, score, notes = align.auto_fit(local, target, args.map_up, like_angle, args.tile_map, args.north_deg, frame.angle,
-                                         outline)
+                                         outline, args.true_width_m)
         fit = {"method": "outline_fit", "iou": round(score, 3), **notes}
         if notes.get("ambiguous"):
             warnings.append("the overlap cannot tell which way is up (two placements, "
@@ -1041,6 +1044,10 @@ def main(argv=None) -> int:
     p.add_argument("--outline-trace", metavar="TRACE.json",
                    help="fit the convex hull of this trace file's `px` outlines to the footprint instead of the image's own "
                         "opaque area (a seating chart on a white page: `tools/svg_zones.py` output)")
+    p.add_argument("--true-width-m", type=float, metavar="M",
+                   help="the real width in metres of the drawing's outline, left to right in the image (a dimension printed on "
+                        "the plan): the drawing is placed at that scale and only turned and moved, never stretched to the footprint. "
+                        "Use it when the footprint is not the building's real size (OSM still holds the pre-construction building)")
     p.add_argument("--fit-to", help="outline GeoJSON (relative to the config) to place the image on, e.g. a tower part")
     p.add_argument("--source-id", help="provenance source id of the image")
     p.set_defaults(func=cmd_basemap)

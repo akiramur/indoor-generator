@@ -211,7 +211,7 @@ tools/                      画像・図面を読む補助スクリプト（`det
 | `import-floorguide <config> --building --map-up` | marunouchi.com のフロアガイドを plan GeoJSON に変換（internal のみ。公開リポジトリには含まれない） |
 | `import-imagemap <config> --page FLOOR=URL --map-up` | イメージマップ形式のフロアページを plan GeoJSON に変換 |
 | `landmarks <config>` | 建物周辺の名前付き出入口・改札（自動位置合わせの手掛かり） |
-| `basemap <config> --level --image` | フロアマップ画像（URL / ローカル）を config 脇に置き、初期配置を出力。向きは `--map-up` / `--north-deg` / `--like-level`、地図アプリのスクリーンショットは `--tile-map`、`--fit-to` で footprint 以外（タワー部分など）にフィット。`--outline-trace <trace>` は、白地に描かれた座席表など、画像自身の外形が使えないとき、trace の輪郭の凸包を footprint に合わせる |
+| `basemap <config> --level --image` | フロアマップ画像（URL / ローカル）を config 脇に置き、初期配置を出力。向きは `--map-up` / `--north-deg` / `--like-level`、地図アプリのスクリーンショットは `--tile-map`、`--fit-to` で footprint 以外（タワー部分など）にフィット。`--true-width-m <M>` は図面の外形の実寸の幅（図面に印刷された寸法）を渡し、その縮尺に固定して回転と移動だけで置く（OSM が建設前の旧ビルのままで footprint の大きさが実際と違うときに、図面が引き伸ばされない）。`--outline-trace <trace>` は、白地に描かれた座席表など、画像自身の外形が使えないとき、trace の輪郭の凸包を footprint に合わせる |
 | `export-floor <config> --level [-o]` | 階の部屋を geojson.io で編集できる GeoJSON として書き出す（`id` = config の部屋 ID、`name`、`category`）。プレビューの「エクスポート」は `GET /floor-export` |
 | `import-floor <config> --file [--level --dry-run]` | 外で編集した階の GeoJSON を取り込む。形・名前が変わった部屋は `update`、`id` がなく `name` がある地物は `add`、なくなった部屋は `delete` にして、`edit-rooms` と同じ経路（`room_edit.apply_edits`）で反映・ビルド。頂点レベルの編集のみ（画像の位置合わせ・nudge はプレビューで）。プレビューの「インポート」は `POST /floor-import` |
 | `edit-rooms <config>` | プレビューの手編集（`room_edits.json`）を階の plan GeoJSON に書き込み（`geometry_source: manual`、plan のない階は `plans/<slug>/<階>-manual.geojson` を新規作成、比率の部屋は plan へ移す）、config を更新して build。plan の上書き前に `configs/.history/plans/` へ退避する（`undo` が戻すのは config のみ） |

@@ -173,9 +173,10 @@ def fit_orientations(path, target: BaseGeometry, map_up: str | None = None, arou
 
 
 def fit_outline(outline: BaseGeometry, target: BaseGeometry, map_up: str | None = None,
-                around: float | None = None) -> list[dict]:
+                around: float | None = None, scale: float | None = None) -> list[dict]:
     """`fit_orientations` for an outline already read (in image pixels, y down). `around` is an image-x angle
-    (see `_image_angle`) to start near, like `map_up` but for any angle."""
+    (see `_image_angle`) to start near, like `map_up` but for any angle. `scale` (metres per pixel) fixes the
+    drawing's size: it is then only turned and moved, never rescaled to the target."""
     if around is not None:
         starts = range(round(around) - 30, round(around) + 31, START_STEP_DEG)
     elif map_up:
@@ -185,9 +186,10 @@ def fit_outline(outline: BaseGeometry, target: BaseGeometry, map_up: str | None 
         starts = range(0, 360, START_STEP_DEG)
     found: list[dict] = []
     for deg in starts:
-        pre = georef.compose(georef.FLIP_Y, georef.similarity(1, deg, (0, 0), 0, 0))
-        t = georef.compose(pre, georef._bbox_align(georef.apply(outline, pre), target))
-        t, iou = georef.refine(outline, target, t, rounds=2)
+        pre = georef.compose(georef.FLIP_Y, georef.similarity(scale or 1, deg, (0, 0), 0, 0))
+        placed = georef.apply(outline, pre)
+        t = georef.compose(pre, georef._bbox_align(placed, target) if scale is None else georef._center_align(placed, target))
+        t, iou = georef.refine(outline, target, t, rounds=2, scale_lock=scale is not None)
         angle = _image_angle(t)
         same = next((f for f in found if _angle_gap(f["angle"], angle) < 20), None)
         if same is None:
@@ -200,7 +202,7 @@ def fit_outline(outline: BaseGeometry, target: BaseGeometry, map_up: str | None 
 def auto_fit(path, target: BaseGeometry, map_up: str | None = None,
              like_angle: float | None = None, tile_map: bool = False,
              north_cw: float | None = None, frame_angle: float = 0.0,
-             outline: BaseGeometry | None = None) -> tuple[list[float], float, dict]:
+             outline: BaseGeometry | None = None, true_width_m: float | None = None) -> tuple[list[float], float, dict]:
     """Choose a placement: (transform from image pixels, IoU 0..1, notes).
 
     `like_angle` (the image-x direction of a floor already placed in this building) picks the candidate that
@@ -215,13 +217,29 @@ def auto_fit(path, target: BaseGeometry, map_up: str | None = None,
     counter-clockwise from true east (`LocalFrame.angle`; the fit runs in the building's own axes).
 
     `outline` is the drawing's own outline in image pixels (y down), for a drawing whose background is not blank (a
-    seating chart read from its zones, `main.py basemap --outline-trace`); it replaces the one read from the image."""
+    seating chart read from its zones, `main.py basemap --outline-trace`); it replaces the one read from the image.
+
+    `true_width_m` is the real width, in metres, of the drawing's outline from left to right in the image (a dimension
+    printed on the plan). The drawing is then placed at that scale (`notes["m_per_px"]`) and only turned and moved, so a
+    footprint that is not the building's real size (OSM still holds the pre-construction building) cannot stretch it."""
     around = (north_cw - frame_angle) % 360 if north_cw is not None else None
-    cands = (fit_outline(outline, target, map_up, around) if outline is not None
-             else fit_outline(tile_map_outline(path)[0], target, map_up, around) if tile_map
-             else fit_orientations(path, target, map_up, around))
+    if true_width_m is not None:
+        if true_width_m <= 0:
+            raise ValueError("true_width_m must be positive")
+        shape = outline if outline is not None else (tile_map_outline(path)[0] if tile_map
+                                                     else image_outline(path, max_side=800, page_colour=True)[0])
+        x0, _, x1, _ = shape.bounds
+        m_per_px = true_width_m / (x1 - x0)
+        cands = fit_outline(shape, target, map_up, around, scale=m_per_px)
+    else:
+        m_per_px = None
+        cands = (fit_outline(outline, target, map_up, around) if outline is not None
+                 else fit_outline(tile_map_outline(path)[0], target, map_up, around) if tile_map
+                 else fit_orientations(path, target, map_up, around))
     best = cands[0]
     notes: dict = {"candidates": [{"angle": round(c["angle"]), "iou": round(c["iou"], 3)} for c in cands[:4]]}
+    if m_per_px is not None:
+        notes.update(true_width_m=true_width_m, m_per_px=round(m_per_px, 5))
     if around is not None:
         notes["north_cw"] = round(north_cw % 360, 1)
         notes["off_north_deg"] = round(_angle_gap(_image_angle(best["t"]), around), 1)

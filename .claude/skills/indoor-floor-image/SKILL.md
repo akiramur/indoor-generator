@@ -20,7 +20,7 @@ front. A result the user is not happy with is fixed by hand in the preview (edit
 1. **Load** — 「この画像を3階に重ねて」:
    - Get the image as png / jpg / webp / svg. Convert a PDF page first (`sips -s format png in.pdf --out /tmp/x.png`
      for page 1, or `pdftoppm -png -f N -l N`), and crop wide margins or legends if they dwarf the plan.
-   - `.venv/bin/python main.py basemap configs/<slug>.json --level 3 --image <path-or-url> [--map-up west | --north-deg 249] [--fit-to <outline>] [--source-id s3]`
+   - `.venv/bin/python main.py basemap configs/<slug>.json --level 3 --image <path-or-url> [--map-up west | --north-deg 249] [--fit-to <outline>] [--true-width-m M] [--source-id s3]`
      places the drawing automatically: it is only scaled, turned and moved (never bent) so its outline covers the
      footprint best, and the output reports the overlap (`fit.iou`) and the candidates it found. **Read the top of the image
      (compass, street names) and pass `--map-up`; if the drawing has a north arrow, read its angle instead and pass
@@ -34,6 +34,16 @@ front. A result the user is not happy with is fixed by hand in the preview (edit
      (the user's own drawing, a converted PDF page) is copied to `configs/plans/<slug>/maps/<floor>.<ext>`; for a page
      converted from a third-party PDF, ask before committing it. Read `--map-up` from the image (compass, street
      names) if you can; it only affects the starting position.
+   - **When the footprint is not the building's real size** (OSM still holds the pre-construction building: its area is far from
+     the plan's floor area, a plain rectangle where the plan is chamfered; see `indoor-map` A.2), do not let the fit stretch the
+     drawing to it: it would be placed 1.4x too big (area 2x). Read the drawing's overall width off its printed dimension line
+     (metres, the outline from left to right in the image) and pass `--true-width-m <that width>`: the drawing is placed at that
+     scale and only turned and moved (`fit.m_per_px` shows the scale, and `fit.iou` is then bounded by the area ratio: 0.5 against a
+     footprint twice as big is normal, so judge the placement by eye). **Check the width**: the outline's area at that scale
+     (its pixel area x `m_per_px`²) should match the typical floor area you found (a printed 貸床面積 / 基準階面積 can be smaller than
+     the outline, because it leaves out walls and cores); if they disagree by more than about 10 %, say so in the report rather than
+     choosing silently. Where the drawing sits on the real building is then settled by landmarks or by hand ("Floor map" mode of the
+     preview, `nudge-map`), not by the old footprint.
    - Put the printed `basemap` object on that floor's entry in the config (add the image's source to `provenance.sources`),
      validate, build. A floor in a `levels` group shares one basemap; split it out if only one floor should have it.
    - **Align it yourself first (自動位置合わせ) — don't hand point-picking to the user:**

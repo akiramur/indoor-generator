@@ -187,3 +187,37 @@ def test_tile_map_outline_reads_the_building_out_of_a_map_screenshot(tmp_path):
     assert 0.02 < outline.area / (800 * 500) < 0.2
     assert outline.bounds[0] < 120 and outline.bounds[2] > 650        # both ends of the building
     assert outline.bounds[3] < 450                                    # not the runway line
+
+
+def test_true_width_keeps_the_drawings_size_when_the_footprint_is_too_big(tmp_path):
+    from shapely import affinity
+    path, _ = _drawing(tmp_path)
+    shape = box(40, 60, 300, 140).union(box(40, 140, 120, 260))
+    truth = georef.compose(georef.FLIP_Y, georef.similarity(0.2, 20, (0, 0), 30, -15))
+    real = georef.apply(shape, truth)
+    # An outdated footprint, twice as wide and long as the real building (OSM still holds the pre-construction building).
+    old = affinity.scale(real, 2, 2, origin=real.centroid)
+
+    def size(t):                       # metres per pixel of a similarity
+        return (t[0] ** 2 + t[2] ** 2) ** 0.5
+
+    t_free, _, _ = align.auto_fit(path, old, map_up="north")
+    assert size(t_free) == pytest.approx(0.4, rel=0.1)      # stretched to the wrong footprint
+
+    # The drawn outline is 261 px wide (PIL's rectangle includes both ends): 52.2 m at 0.2 m/px.
+    t, iou, notes = align.auto_fit(path, old, map_up="north", true_width_m=52.2)
+    assert size(t) == pytest.approx(0.2, rel=1e-6)          # kept exactly
+    assert notes["m_per_px"] == pytest.approx(0.2, abs=1e-4) and notes["true_width_m"] == 52.2
+    placed = georef.apply(shape, t)
+    assert placed.area == pytest.approx(real.area, rel=1e-6)
+    assert placed.intersection(old).area / placed.area > 0.99   # inside the footprint (where exactly is up to the overlap)
+    assert 0.2 < iou < 0.35                                   # the overlap is bounded by the area ratio (about 0.25)
+    assert t[0] ** 2 + t[2] ** 2 == pytest.approx(t[1] ** 2 + t[3] ** 2, rel=1e-6)   # still no shear
+
+
+def test_true_width_must_be_positive(tmp_path):
+    path, _ = _drawing(tmp_path)
+    with pytest.raises(ValueError):
+        align.auto_fit(path, box(0, 0, 50, 50), map_up="north", true_width_m=0)
+    with pytest.raises(ValueError):
+        align.auto_fit(path, box(0, 0, 50, 50), map_up="north", true_width_m=-3)

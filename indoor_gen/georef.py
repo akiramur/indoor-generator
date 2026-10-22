@@ -69,8 +69,15 @@ def _bbox_align(src: BaseGeometry, target: BaseGeometry) -> list[float]:
     return [s, 0.0, 0.0, s, bcx - s * acx, bcy - s * acy]
 
 
-def refine(src: BaseGeometry, target: BaseGeometry, t: list[float], rounds: int = 4) -> tuple[list[float], float]:
-    """Coordinate search on scale / rotation / translation after `t`."""
+def _center_align(src: BaseGeometry, target: BaseGeometry) -> list[float]:
+    """Move `src` (its scale kept) so that its bounding box is centred on the target's."""
+    a, b = src.bounds, target.bounds
+    return [1.0, 0.0, 0.0, 1.0, (b[0] + b[2]) / 2 - (a[0] + a[2]) / 2, (b[1] + b[3]) / 2 - (a[1] + a[3]) / 2]
+
+
+def refine(src: BaseGeometry, target: BaseGeometry, t: list[float], rounds: int = 4,
+           scale_lock: bool = False) -> tuple[list[float], float]:
+    """Coordinate search on scale / rotation / translation after `t` (with `scale_lock`, only rotation and translation)."""
     size = math.sqrt(target.area) or 1.0
     best_t, best = t, iou(apply(src, t), target)
     origin = (target.centroid.x, target.centroid.y)
@@ -79,7 +86,7 @@ def refine(src: BaseGeometry, target: BaseGeometry, t: list[float], rounds: int 
         improved = True
         while improved:
             improved = False
-            candidates = [similarity(ds, 0, origin, 0, 0) for ds in (1 - step_s, 1 + step_s)]
+            candidates = [] if scale_lock else [similarity(ds, 0, origin, 0, 0) for ds in (1 - step_s, 1 + step_s)]
             candidates += [similarity(1, dr, origin, 0, 0) for dr in (-step_rot, step_rot)]
             candidates += [similarity(1, 0, origin, dx, dy)
                            for dx, dy in ((step_xy, 0), (-step_xy, 0), (0, step_xy), (0, -step_xy))]

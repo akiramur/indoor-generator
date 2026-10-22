@@ -49,7 +49,7 @@ front. A result the user is not happy with is fixed by hand in the preview (edit
         mode: "similarity", pairs: [{px, lnglat, label: "<name> (osm node <id>)"}]}) (2+ well-spread pairs), then `.venv/bin/python main.py align --apply configs/<slug>.json`.
      5. Screenshot the floor in the preview to confirm, and report which landmarks were used / dropped.
      6. **Check image and rooms still agree** (do this after every alignment, also a re-alignment, the preview's
-        "Save this floor only" / "Apply to all floors", or `mapbox-footprint --realign`): moving the image never moves a plan's rooms. If the floor has
+        "Save this floor only" / "Apply to all floors", or `nudge-map`): moving the image never moves a plan's rooms. If the floor has
         `plans/<slug>/<floor>-trace.json`, rerun `main.py trace` (step 3) so the rooms follow the new placement. If the
         plan comes from an importer, or was traced by hand, screenshot with and without the map (`show-map=on|off`) and
         compare tenants against the image; if they are off, say so in the report and offer a re-trace. A basemap with
@@ -96,7 +96,7 @@ front. A result the user is not happy with is fixed by hand in the preview (edit
    "icon": "elevator", "source": "s1", "point": [x, y]}` entries of the same file (a point POI, no room; see config_guide.md).
    A map that draws them as circles with a legend can be scanned with `tools/detect_pictograms.py` (candidates only: check
    its contact sheets; `--squares R,G,B` for solid-colour square icons). Read coordinates with `tools/crop_grid.py`, write them with `tools/add_points.py` (from a list, or `--from-detect --accept 0:elevator,...`), check the
-   result with `tools/overlay_trace.py <image> <trace.json> --out x.png`. **Pictograms** (point POIs) outside the footprint are dropped at build, but **traced rooms stay even where they stick out of the footprint** (the Mapbox Building; see the footprint policy in `indoor-map` A.2): report the share inside, never clip or drop them for it. A schematic map (not to scale) can disagree with the footprint by tens of metres; a map-app screenshot (terrain around the building) is placed with `basemap --tile-map`. Rooms that are only named by a label on the map, with a guessed boundary, take `"geometry_source": "ratio"` in the trace file (graded `listed`, not `traced`);
+   result with `tools/overlay_trace.py <image> <trace.json> --out x.png`. **Pictograms** (point POIs) outside the footprint are dropped at build, but **traced rooms stay even where they stick out of the footprint** (the OSM outline, or one drawn from the plan; see the footprint policy in `indoor-map` A.2): report the share inside, never clip or drop them for it. A schematic map (not to scale) can disagree with the footprint by tens of metres; a map-app screenshot (terrain around the building) is placed with `basemap --tile-map`. Rooms that are only named by a label on the map, with a guessed boundary, take `"geometry_source": "ratio"` in the trace file (graded `listed`, not `traced`);
    skip decorative ladders between icons.
    Report: the landmarks used / dropped for the alignment and its RMS, the traced rooms with areas, how much of
    each was clipped by the footprint, what was renamed or merged, and the share left as 共用部・通路.

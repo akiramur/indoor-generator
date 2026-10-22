@@ -1,4 +1,4 @@
-"""Move a building's plans and floor maps together when its footprint is replaced (`main.py mapbox-footprint`).
+"""Move a building's plans and floor maps together when its footprint is replaced (`fit`, a library function: no command calls it now) or by hand (`main.py nudge-map`).
 
 One similarity transform (scale, rotation, shift) is fitted for the whole building: the union of every floor's plan
 rooms is moved onto the new footprint (best overlap). The same transform is applied to every plan GeoJSON, to the

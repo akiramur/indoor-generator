@@ -3,41 +3,7 @@ import json
 from shapely.geometry import Point, box, shape
 from shapely.affinity import translate
 
-from indoor_gen import mapbox_building as mb, realign
-
-
-def _varint(n):
-    out = bytearray()
-    while True:
-        b = n & 0x7F
-        n >>= 7
-        out.append(b | (0x80 if n else 0))
-        if not n:
-            return bytes(out)
-
-
-def _field(no, wire, payload):
-    key = _varint(no << 3 | wire)
-    return key + (_varint(len(payload)) + payload if wire == 2 else _varint(payload))
-
-
-def _zz(n):
-    return (n << 1) ^ (n >> 31)
-
-
-def _tile_with_square(x0, y0, x1, y1):
-    """A vector tile whose `building` layer holds one square (tile units, 4096 extent)."""
-    cmds = [(1 & 7) | (1 << 3), _zz(x0), _zz(y0), (2 & 7) | (3 << 3), _zz(x1 - x0), 0, 0, _zz(y1 - y0), _zz(x0 - x1), 0, 7 | (1 << 3)]
-    feature = _field(3, 0, 3) + _field(4, 2, b"".join(_varint(c) for c in cmds))
-    layer = _field(1, 2, b"building") + _field(2, 2, feature) + _field(5, 0, 4096) + _field(15, 0, 2)
-    return _field(3, 2, layer)
-
-
-def test_decode_building_polygon():
-    polys = mb.decode_buildings(_tile_with_square(1024, 1024, 3072, 3072), 16, 58_000, 25_800)
-    assert len(polys) == 1 and polys[0].is_valid
-    w = polys[0].bounds[2] - polys[0].bounds[0]
-    assert abs(w - 0.5 * 360 / 2 ** 16) < 1e-9       # half a tile wide
+from indoor_gen import realign
 
 
 def _config(tmp_path, plan_geom, corners):
@@ -183,3 +149,13 @@ def test_nudge_of_one_floor_leaves_the_other_floors_alone(tmp_path):
     realign.apply(raw, tmp_path, realign.manual(raw, tmp_path, fp, east_m=10), level=2)
     assert (tmp_path / "plans" / "1F.geojson").read_text() == f1 and raw["floors"][0]["basemap"]["corners"] == corners
     assert (tmp_path / "plans" / "2F.geojson").read_text() != f2 and raw["floors"][1]["basemap"]["corners"][0][0] > corners[0][0]
+
+
+def test_footprint_warning_for_a_shape_extracted_from_mapbox_streets():
+    from indoor_gen.generate_geojson import footprint_warning
+
+    assert footprint_warning("b", {"metadata": {"footprint_source": "osm"}}) is None
+    assert footprint_warning("b", {"metadata": {"footprint_source": "manual"}}) is None
+    assert footprint_warning("b", {"metadata": {}}) is None
+    msg = footprint_warning("b", {"metadata": {"footprint_source": "mapbox"}})
+    assert msg and msg.startswith("b:") and "Product Terms" in msg

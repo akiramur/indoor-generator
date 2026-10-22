@@ -61,9 +61,9 @@ flowchart LR
 
 **A. 初回生成**
 1. リクエストを解釈（建物名・階・レイアウトのヒント）。候補が複数なら AskUserQuestion で確認
-2. `locate` で建物を特定し、`osm_id` で固定した最小 config を書く。続けて `mapbox-footprint --dry-run` で Mapbox Building との重なり（`iou_with_replaced`）と面積を確認し、
-   妥当なら `mapbox-footprint` で Mapbox Building の形を footprint（`plans/<slug>/footprint.geojson`、`source.type: geojson`）にする（OSM は特定用に残す）。
-   **既定の方針**: footprint は Mapbox Building とし、床マップや略図から描き直さない。トレースした部屋は footprint の外にはみ出しても削除・切り取りをせず、床スラブと外壁がそれに追従する（外に出た割合は `trace` の出力で報告）。
+2. `locate` で建物を特定し、`osm_id` で固定した最小 config を書く。footprint は OSM の外形を使う（形が古い建物・粗い形のときは、建物自身の床図面の外壁、またはトレースした店舗の和集合から描く。
+   `plans/<slug>/footprint.geojson`、`source.type: geojson`。OSM は特定用に残す）。
+   **既定の方針**: footprint は OSM の外形（または上の描いた形）とし、縮尺の合わない略図からは描き直さない。**Mapbox の地図タイル（Mapbox Streets の Building）から形を取り出さない・保存しない・公開しない**（Mapbox 製品規約 1.6 なぞり・導出・抽出の禁止、1.9 キャッシュ・保存の禁止、1.10 再配布の禁止）。トレースした部屋は footprint の外にはみ出しても削除・切り取りをせず、床スラブと外壁がそれに追従する（外に出た割合は `trace` の出力で報告）。
    例外は OSM が建て替え前の形のままのとき（面積が延床面積 ÷ 階数と大きく違う等）で、建物自身のフロアプランの外壁を実寸でトレースして footprint にする。
    塔・段付きの建物は `parts` で `building:part` を取得し、該当階の `outline` に使う。床マップから描いた `outline` は任意で、`properties.follows_map: true` を付けて `nudge-map` で一緒に動かす
 3. Web 調査（公式フロアガイド、階数・高さ・延床面積、`locate` の OSM タグで裏取り）。出典は `provenance.sources` に記録し、各部屋に `confidence`（`sourced` / `estimated`）を付ける。
@@ -159,8 +159,7 @@ indoor_gen/
   georef.py                 図面を footprint にフィットさせるアフィン変換探索
   align.py                  画像ピクセルと地図上の対応点から画像の四隅を求める（similarity のみ）。`auto_fit` が外形の重なり（IoU）で自動配置
   crop.py                   ビルド時に、表示するフロアマップ画像を階の範囲 + 余白に切り詰める（元画像は `source_url` として位置合わせ用に残し、切り取り矩形は `crop_px`）
-  mapbox_building.py        Mapbox Building（Streets v8 タイル、自前の protobuf リーダー）の形を footprint にする（`mapbox-footprint`）
-  realign.py                plan・フロアマップを相似変換でまとめて動かす（`mapbox-footprint --realign` と `nudge-map`）
+  realign.py                plan・フロアマップを相似変換でまとめて動かす（`nudge-map`）
   room_edit.py              プレビューでの手編集（`room_edits.json`）を plan GeoJSON へ反映（`edit-rooms`）
   geojsonio.py              geojson.io との往復（`export-floor` / `import-floor`）。差分は `room_edit.apply_edits` の経路で反映
   history.py                ビルド済み config のスナップショットと undo
@@ -181,7 +180,7 @@ indoor_gen/
 configs/
   <slug>.json               建物 config（source of truth）
   plans/<slug>/<floor>.geojson   フロアごとの plan（実形状の部屋）
-  plans/<slug>/footprint.geojson  footprint（Mapbox Building の形、または手で描いた形）
+  plans/<slug>/footprint.geojson  footprint（OSM を使えないときの、床図面やトレースした店舗から描いた形）
   plans/<slug>/<floor>-manual.geojson  プレビューの手編集で作られた、plan のない階の plan
   plans/<slug>/<floor>-trace.json  画像ピクセルで描いた部屋の輪郭・点 POI（`trace` の入力）
   plans/<slug>/seat-spec.json    座席ブロックの仕様（`tools/gen_seat_plan.py` の入力）
@@ -217,7 +216,6 @@ tools/                      画像・図面を読む補助スクリプト（`det
 | `import-floor <config> --file [--level --dry-run]` | 外で編集した階の GeoJSON を取り込む。形・名前が変わった部屋は `update`、`id` がなく `name` がある地物は `add`、なくなった部屋は `delete` にして、`edit-rooms` と同じ経路（`room_edit.apply_edits`）で反映・ビルド。頂点レベルの編集のみ（画像の位置合わせ・nudge はプレビューで）。プレビューの「インポート」は `POST /floor-import` |
 | `edit-rooms <config>` | プレビューの手編集（`room_edits.json`）を階の plan GeoJSON に書き込み（`geometry_source: manual`、plan のない階は `plans/<slug>/<階>-manual.geojson` を新規作成、比率の部屋は plan へ移す）、config を更新して build。plan の上書き前に `configs/.history/plans/` へ退避する（`undo` が戻すのは config のみ） |
 | `nudge-map <config> [--rotate-deg --scale --east-m --north-m --level N]` | 全階（`--level` ならその階の plan・外形・フロアマップだけ）の plan・フロアマップの四隅・対応点を、外枠の中心まわりの相似変換（回転は反時計回り）で動かす（`realign.manual`）。`building.footprint_follows_map: true`（床マップから描いた footprint、例: 羽田 T2）の建物では footprint と outline のファイルも動かす。プレビューの編集モード（「フロアマップ」モード）のスライダー・ドラッグ（`POST /nudge`）から呼ばれ、調整中はブラウザで画像だけを動かして見せる |
-| `mapbox-footprint <config>` | OSM 外枠を Mapbox の Building（Streets v8 `building` タイル、`mapbox_building.py`）の形に置き換え、`plans/<slug>/footprint.geojson` に保存して `building.source`（geojson）に設定。`--realign` で全階の plan の部屋の和集合（通路を 6m 閉じたもの）を新外枠へ重ねる相似変換を求め（`realign.py`）、plan GeoJSON・フロアマップの四隅・対応点を同じ変換で動かす（plan は `configs/.history/plans/` に退避）。`--dry-run` は書き込まず報告のみ |
 | `align <config> [--apply] [--reset LEVEL]` | `alignment.json` の対応点から画像の四隅を求める。`--apply` で config に反映して build、`--reset` で自動配置に戻す |
 | `trace <config> --level --rooms` | 画像ピクセル座標の部屋輪郭を、そのフロアの位置合わせ経由で plan GeoJSON に変換 |
 | `report <target> [--top --json]` | 部屋ごとの根拠グレードをフロア別に集計し、調べ直すべき弱い部屋を列挙（`quality.json`） |
@@ -491,7 +489,7 @@ Mapbox Tiling Service で ソース置換 → recipe 更新 → publish → 完�
 | `test_crop.py` | フロアマップ画像の切り詰め（階の範囲 + 余白、`crop_px`） |
 | `test_geojsonio.py` | geojson.io との往復（書き出し、差分 → `update` / `add` / `delete`） |
 | `test_indoor_v3.py` | 出力が indoor-v3 のデータモデル・語彙に沿うか |
-| `test_mapbox_footprint.py` | Mapbox Building の取得・形の置き換え・`--realign` |
+| `test_realign.py` | plan・フロアマップの相似変換（`realign.py`）、`nudge-map`、footprint の出所の表示と警告 |
 | `test_preview_refresh.py` | `build_preview.refresh`（古いページの再描画、データの維持） |
 | `test_seat_plan.py` | `gen_seat_plan.py`（座席ブロック → 点座席・行ラベル・部屋） |
 | `test_svg_zones.py` | `svg_zones.py`（ベクタの座席表 → ゾーン輪郭） |

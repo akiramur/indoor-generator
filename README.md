@@ -10,7 +10,7 @@ A tool that generates indoor maps of real buildings (GeoJSON in the
 
 ```
 "Make an indoor map of Marunouchi Building"
-  → footprint (OSM to locate, Mapbox Building shape) + web research (official floor guides, etc.)
+  → footprint (OSM outline, or drawn from the floor plan) + web research (official floor guides, etc.)
   → configs/<slug>.json
   → Python pipeline
   → output/<slug>/indoor.geojson + live preview
@@ -141,7 +141,6 @@ Every command prints its result as JSON to stdout, except `report`, which prints
 | `import-imagemap` | Import real tenant shapes from floor-guide pages drawn as HTML image maps (more site-specific importers can be added as `indoor_gen/importers/*_cli.py`, see the `indoor-importer` skill) |
 | `basemap` / `landmarks` / `align` / `trace` | Place, align and trace floor-map images |
 | `edit-rooms` | Apply hand edits of room shapes made in the preview (move / add / delete vertices, delete / add rooms) and build |
-| `mapbox-footprint` | Use the Mapbox Building's shape (Mapbox Streets `building` layer) as the footprint instead of the OSM outline; `--realign` also moves the plans and floor maps to fit it (one similarity transform), `--dry-run` only reports |
 | `report` / `compare` / `cost` | Sourcing quality, compare two builds, estimated Claude usage cost |
 | `publish` / `viewer` | Publish all buildings as one tileset (dry run and dev by default); check the published result |
 
@@ -167,7 +166,7 @@ Run `main.py <command> --help` for the options.
 `import-imagemap` (and any site-specific importer) reads the public floor-guide pages of shopping sites. Check each site's terms of use and
 robots.txt before using them; they send a plain User-Agent, cache every download under `output/` and are meant for occasional,
 personal use. Do not commit third-party images or SVGs (`configs/plans/*/maps/` is git-ignored); the config keeps the URL.
-`mapbox-footprint` uses Mapbox Streets data through your own token, under the Mapbox terms of service.
+The tool does not copy shapes out of Mapbox's map tiles: the Mapbox Product Terms do not allow tracing, extracting, storing or redistributing that content. Footprints come from OpenStreetMap or are drawn from the floor plan.
 
 Maps built from a third party's floor guide or floor-map image (imported shapes, traces, a published tileset) may be derivative works. Get the
 rights holder's permission before you share or publish them.
@@ -183,6 +182,6 @@ rights holder's permission before you share or publish them.
 - **Accuracy.** The maps are built from web research and estimates (rooms graded `estimated` / `listed` have no sourced shape) and are approximations. Do not use them for navigation, evacuation or any safety-critical purpose. Provided "as is", without warranty (see `LICENSE`).
 - `publish --upload` replaces one tileset shared by all buildings. If the local `output/` is incomplete, buildings disappear from it, so check the dry-run list first. Production needs `--target prod`.
 - Third-party material such as official floor-map images is never committed (the config keeps the URL; images are cached under `output/`).
-- Map data: footprints and coordinates come from © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL) and, with `mapbox-footprint`, from Mapbox Streets (under the Mapbox terms of service). Keep the attribution when you publish maps built with this tool.
+- Map data: footprints and coordinates come from © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL), or are drawn from the floor plans you provide. Keep the attribution when you publish maps built with this tool, and check the rights to the floor plans you use.
 - The preview server writes configs and plans on your machine, so it accepts only requests addressed to localhost and refuses cross-site POSTs. `serve --host 0.0.0.0` opens it to your network (no sign-in): use it only on a network you trust.
 - OSM APIs are used within Nominatim's 1 req/s limit. Footprints are cached in `output/<slug>/footprint_cache.geojson`.

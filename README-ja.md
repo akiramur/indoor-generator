@@ -138,7 +138,6 @@ cp publish.example.json publish.json
 | `basemap` / `landmarks` / `align` / `trace` | フロアマップ画像の配置・位置合わせ・トレース |
 | `edit-rooms` | プレビューでの部屋の形の手編集（頂点の移動・追加・削除、部屋の削除・追加、複数の部屋の結合。離れた部屋は 5 m までのすき間を埋めて結合）を反映して build。「真上から」ボタンは、表示中のフロアマップの上が画面の上になる向きに回す |
 | `nudge-map` | 建物の全 plan とフロアマップを、回転（反時計回り）・拡大縮小・東西南北の移動で少しだけ動かす（プレビューのスライダーからも同じことができる） |
-| `mapbox-footprint` | OSM 外枠の代わりに Mapbox の Building（Mapbox Streets の `building` レイヤー）の形を外枠にする。`--realign` で plan とフロアマップも合わせて動かす（相似変換 1 つ）、`--dry-run` は報告のみ |
 | `report` / `compare` / `cost` | 出典の確度、2 ビルドの比較、Claude 利用コストの推定 |
 | `publish` / `viewer` | 全建物を 1 つのタイルセットへ公開（既定はドライラン・dev）、公開結果の確認 |
 
@@ -164,7 +163,7 @@ cp publish.example.json publish.json
 `import-imagemap`（とサイト専用の importer）は商業施設サイトが公開しているフロアガイドのページを読みます。使う前に各サイトの利用規約と
 robots.txt を確認してください。取得は素の User-Agent で行い、ダウンロードはすべて `output/` にキャッシュします（たまに個人で使う想定です）。
 第三者の画像や SVG はコミットしないでください（`configs/plans/*/maps/` は git 管理外。config には URL だけを残します）。
-`mapbox-footprint` は自分のトークンで Mapbox Streets のデータを使います（Mapbox の利用規約の範囲で）。
+このツールは、Mapbox の地図タイルから形をコピーしません（Mapbox の製品規約は、そのコンテンツのなぞり・抽出・保存・再配布を認めていません）。footprint は OpenStreetMap か、床図面から描いた形を使います。
 
 第三者のフロアガイドやフロアマップ画像から作ったマップ（取り込んだ形状、トレース結果、公開したタイルセット）は二次的著作物になりえます。共有・公開する前に、権利者の許諾を得てください。
 
@@ -179,6 +178,6 @@ robots.txt を確認してください。取得は素の User-Agent で行い、
 - **精度。** マップは Web 調査と推定から作られた近似です（`estimated` / `listed` の部屋は形に出典がありません）。ナビゲーション、避難など、安全に関わる用途には使わないでください。現状のまま提供し、保証はありません（`LICENSE` 参照）。
 - 公開（`publish --upload`）は全建物で 1 つのタイルセットを置き換えます。ローカルの `output/` が不完全だと建物が消えるので、先にドライランで一覧を確認してください。本番へは `--target prod` が必要です。
 - 公式サイトのフロアマップ画像など第三者の素材はリポジトリにコミットしません（config は URL を保持し、画像は `output/` にキャッシュされます）。
-- 地図データ: footprint や座標は © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors（ODbL）と、`mapbox-footprint` 使用時は Mapbox Streets（Mapbox の利用規約）に由来します。このツールで作った地図を公開するときは帰属表示を残してください。
+- 地図データ: footprint や座標は © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors（ODbL）に由来するか、利用者が用意した床図面から描いたものです。このツールで作った地図を公開するときは帰属表示を残し、使う床図面の権利も確認してください。
 - プレビューサーバーは手元の config や plan を書き換えるため、localhost 宛のリクエストだけを受け付け、他サイトからの POST は拒否します。`serve --host 0.0.0.0` はネットワークに公開します（認証なし）。信頼できるネットワークでだけ使ってください。
 - OSM の API は Nominatim の 1 req/s 制限を守って利用します。footprint は `output/<slug>/footprint_cache.geojson` にキャッシュされます。

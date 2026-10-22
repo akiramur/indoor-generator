@@ -44,7 +44,7 @@
         },
         "total_floors": {"type": "integer", "minimum": 1},
         "basement_floors": {"type": "integer", "minimum": 0},
-        "footprint_follows_map": {"type": "boolean", "description": "The footprint (a GeoJSON file) and the floors' `outline` files were drawn from the floor maps, so `nudge-map` / `mapbox-footprint --realign` move them together with the maps and plans (default: the footprint is the real shape and stays put)."}
+        "footprint_follows_map": {"type": "boolean", "description": "The footprint (a GeoJSON file) and the floors' `outline` files were drawn from the floor maps, so `nudge-map` moves them together with the maps and plans (default: the footprint is the real shape and stays put)."}
       }
     },
     "provenance": {

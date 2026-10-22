@@ -161,6 +161,9 @@ def cmd_build(args) -> int:
               "quality_area_pct": {g: v["area_pct"] for g, v in quality_report["total"].items()},
               "quality_change": quality.change(quality_before, quality_report),
               **summarise(fc, changes)}
+    fp_warning = generate_geojson.footprint_warning(cfg.slug, fc)
+    if fp_warning:
+        result["warnings"] = [fp_warning]
     _print_json(result)
     return 0
 
@@ -193,15 +196,19 @@ def cmd_publish(args) -> int:
         _print_json({"ok": False, "error": "no built buildings (run build first)"})
         return 1
     warnings = quality.publish_warnings(buildings, args.warn_weak_pct)
+    footprint_warnings = [w for w in (generate_geojson.footprint_warning(slug, fc) for slug, fc in buildings) if w]
     for w in warnings:
         print(f"warning: {w['message']}", file=sys.stderr)
+    for w in footprint_warnings:
+        print(f"warning: {w}", file=sys.stderr)
     ndjson, counts = publish.to_ndjson(buildings)
     dest = OUTPUT_ROOT / "_publish"
     dest.mkdir(parents=True, exist_ok=True)
     _write_atomic(dest / f"{tileset}.ndjson", ndjson)
     result = {"ok": True, "uploaded": False, "target": target, "tileset": f"{username}.{tileset}" if username else tileset,
               "buildings": counts, "skipped_samples": skipped, "bytes": len(ndjson.encode("utf-8")),
-              "ndjson": str(dest / f"{tileset}.ndjson"), "quality_warnings": warnings}
+              "ndjson": str(dest / f"{tileset}.ndjson"), "quality_warnings": warnings,
+              "footprint_warnings": footprint_warnings}
     if not args.upload:
         result["next"] = ("dry run; add --upload (needs a publish.json username and a secret "
                           "token with tilesets:write/read/list in $MAPBOX_UPLOAD_TOKEN)")
@@ -754,40 +761,6 @@ def cmd_import_floor(args) -> int:
     return _write_and_build(path, {"ok": True, "level": level, "summary": summary, **res}, raw)
 
 
-def cmd_mapbox_footprint(args) -> int:
-    """Replace the OSM footprint by the Mapbox Building's shape and move the plans / floor maps to match."""
-    from indoor_gen import history, mapbox_building, realign
-
-    path = Path(args.config).resolve()
-    try:
-        cfg = config.load(path)
-        raw = config.load_raw(path)
-        out = _out_dir(cfg.slug)
-        if raw["building"]["source"].get("type") == "geojson" and not (args.force or args.dry_run):
-            _print_json({"ok": False, "error": "the footprint is already a GeoJSON file (drawn or measured by hand?); "
-                                               "--force replaces it by the Mapbox Building's shape"})
-            return 1
-        old_fp, _ = resolve_footprint(raw["building"]["source"], out / "footprint_cache.geojson", base_dir=path.parent)
-        new_fp, info = mapbox_building.mapbox_footprint(old_fp, args.token)
-        res = realign.fit(raw, path.parent, new_fp) if (args.realign or args.dry_run) else {"moved": False, "t": None}
-    except (config.ConfigError, FetchError) as e:
-        _print_json({"ok": False, "error": str(e) if isinstance(e, FetchError) else e.errors})
-        return 1
-    report = {"ok": True, "footprint": info,
-              "realign": {k: v for k, v in res.items() if k not in ("t", "frame")}}
-    if args.dry_run:
-        _print_json({**report, "dry_run": True})
-        return 0
-    history.record(path, cfg.slug)
-    fp_rel = f"plans/{cfg.slug}/footprint.geojson"
-    fp_path = path.parent / fp_rel
-    fp_path.parent.mkdir(parents=True, exist_ok=True)
-    fp_path.write_text(json.dumps(mapbox_building.footprint_feature(new_fp, info), ensure_ascii=False) + "\n", encoding="utf-8")
-    report["realign"]["changed"] = realign.apply(raw, path.parent, res, out)
-    raw["building"]["source"] = {"type": "geojson", "path": fp_rel}
-    return _write_and_build(path, report, raw)
-
-
 def cmd_nudge_map(args) -> int:
     """Move every plan and floor map of a building by a small hand-set amount (rotation, scale, shift)."""
     from indoor_gen import history, realign
@@ -1096,16 +1069,6 @@ def main(argv=None) -> int:
     p.add_argument("--level", type=int)
     p.add_argument("--dry-run", action="store_true", help="only list what would change")
     p.set_defaults(func=cmd_import_floor)
-
-    p = sub.add_parser("mapbox-footprint", help="use the Mapbox Building's shape as the footprint (instead of the OSM outline) "
-                                                "and move the plans and floor maps to match")
-    p.add_argument("config")
-    p.add_argument("--token", help="public Mapbox token (default $MAPBOX_ACCESS_TOKEN)")
-    p.add_argument("--realign", action="store_true", help="also move the plans and floor maps (one similarity transform, best overlap with the new footprint); "
-                                                         "by default they stay where they are")
-    p.add_argument("--force", action="store_true", help="replace a footprint that is already a GeoJSON file (e.g. measured by hand)")
-    p.add_argument("--dry-run", action="store_true", help="show the new footprint and how far the plans would move, write nothing")
-    p.set_defaults(func=cmd_mapbox_footprint)
 
     p = sub.add_parser("nudge-map", help="move every plan and floor map of a building (or one floor with --level) by a small hand-set amount "
                                          "(rotation counter-clockwise about the footprint's centre, scale, shift east / north)")

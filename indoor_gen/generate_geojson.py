@@ -289,7 +289,8 @@ def config_hash(raw: dict) -> str:
 
 
 def footprint_source(source: dict, base_dir: Path) -> str:
-    """Where the footprint comes from, for the preview's label: "mapbox" (Mapbox Building), "osm" or "manual" (a GeoJSON file)."""
+    """Where the footprint comes from, for the preview's label: "osm", "manual" (a GeoJSON file) or "mapbox" (a shape that older
+    builds extracted from Mapbox Streets; see `footprint_warning`)."""
     src = source or {}
     if src.get("type") != "geojson":
         return "osm"
@@ -299,6 +300,17 @@ def footprint_source(source: dict, base_dir: Path) -> str:
     except (OSError, ValueError, KeyError, AttributeError):
         return "manual"
     return "mapbox" if str(props.get("source", "")).startswith("mapbox") else "manual"
+
+
+def footprint_warning(slug: str, fc: dict) -> str | None:
+    """A message when the footprint was taken from Mapbox Streets (older builds, `mapbox-footprint` no longer exists):
+    the Mapbox Product Terms (1.6 no tracing / deriving / extracting, 1.9 no caching or storing, 1.10 no redistribution)
+    do not allow publishing a shape extracted from Mapbox's tiles. Replace it by the OSM outline or by an outline drawn
+    from the floor plan (`indoor-map` skill, A.2) before the data is published or shared."""
+    if (fc.get("metadata") or {}).get("footprint_source") != "mapbox":
+        return None
+    return (f"{slug}: the footprint was extracted from Mapbox Streets, which the Mapbox Product Terms do not allow to be "
+            "stored or redistributed: use the OSM outline or one drawn from the floor plan before publishing or sharing this data")
 
 
 def generate(cfg: BuildingConfig, footprint_wgs84: BaseGeometry) -> dict:

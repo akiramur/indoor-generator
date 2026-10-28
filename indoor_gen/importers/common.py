@@ -29,7 +29,8 @@ def share_frames(analyses: list[dict]) -> None:
     A floor map whose outline differs a lot from the best floor's (a basement wider than the tower above it) is
     not "the same framing" by its outline alone. An importer that knows its source draws every floor on one
     fixed canvas sets `fixed_frame` (and `canvas`): such floors share the frame whenever the canvases are equal. For
-    Marunouchi Building B1F that is the difference between 1 and 10 of 44 surveyed shops matched.
+    a building whose basement is wider than its tower that is the difference between a handful of shops and most of them
+    landing on their real outlines.
     """
     if not analyses:
         return

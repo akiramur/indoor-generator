@@ -20,8 +20,8 @@ ignores: the maps themselves are third-party and never committed.
 `tools/add_points.py trace <trace.json> --from-detect found.json --image map.png --accept 0:elevator,...` takes it as it is
 (`--image` is the path as given to `classify`); `classify` prints the accept list for the candidates it is sure of
 (`--sure-agreement` 0.9 and `--sure-margin` 0.08 by default; a sure `other` is never listed). Look at a contact sheet of the
-rest, accept or reject them with `add`, and the bank gets better. Tried on JR East's maps: 1F's 34 icons labelled B1's 133
-candidates (stairs / escalator / elevator / ticket machine / baggage), 40 of 40 sampled checked by eye right.
+rest, accept or reject them with `add`, and the bank gets better. Tried on a station's two floor maps: one floor's 34 icons labelled
+the other's 133 candidates (stairs / escalator / elevator / ticket machine / baggage), 40 of 40 sampled checked by eye right.
 """
 
 from __future__ import annotations

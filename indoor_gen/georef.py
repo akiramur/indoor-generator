@@ -105,7 +105,7 @@ def fit_fixed_scale(src: BaseGeometry, target: BaseGeometry, scale: float, base:
 
     For drawings whose scale is known (a source that draws every building at one scale): fitting the scale by overlap
     inflates it when the drawn outline is smaller than the footprint (an outline that leaves out side wings), which
-    stretched every shop of Shin-Marunouchi 2.4-2.8x in area."""
+    made every shop of a large building 2-3x too big in area."""
     base = base or IDENTITY
     orientations = orientations or [(k, m) for k in range(4) for m in (False, True)]
     best_t, best = None, -1.0

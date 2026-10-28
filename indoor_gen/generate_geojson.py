@@ -19,7 +19,7 @@ from .geo_utils import LocalFrame
 
 MIN_PART_AREA = 1.0  # m², slivers below this are dropped
 # A pictogram read off a floor map is kept when it lies within this many metres of the floor's area: the footprint is
-# an OSM outline that can be a few metres short of the real building (Tokyo Station's south end, 2-4 m), and a floor map
+# an OSM outline that can be a few metres short of the real building (a few metres at a station's end), and a floor map
 # is placed to a metre or two at best. Plan rooms are never cut to the footprint; pictograms get the same leeway.
 POI_FOOTPRINT_MARGIN_M = 5.0
 SLAB_THICKNESS = 0.15

@@ -81,6 +81,18 @@ def refresh(index_path: Path) -> bool:
 MIME = {".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 
 
+def sniff_image_suffix(data: bytes) -> str:
+    """File suffix for image bytes ('' when unknown): for a URL with no extension, like a CMS endpoint (`/photo?id=6279`)."""
+    head = data[:16]
+    if head.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if head.startswith(b"\x89PNG"):
+        return ".png"
+    if head[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    return ".svg" if b"<svg" in data[:2048] else ""
+
+
 def image_file(url: str, cache_dir: Path, base_dir: Path | None = None) -> Path:
     """Local file for a basemap image. http(s) URLs are downloaded once into `cache_dir`
     (under output/, so third-party maps stay out of the repository); other values are
@@ -92,10 +104,20 @@ def image_file(url: str, cache_dir: Path, base_dir: Path | None = None) -> Path:
     if not url.startswith(("http://", "https://")):
         return (base_dir or Path.cwd()) / url
     suffix = Path(url.split("?")[0]).suffix.lower()
-    path = cache_dir / (hashlib.sha1(url.encode()).hexdigest()[:16] + suffix)
+    stem = hashlib.sha1(url.encode()).hexdigest()[:16]
+    if not suffix:  # no extension in the URL: the cached file's suffix comes from the image itself
+        cached = sorted(cache_dir.glob(stem + ".*")) if cache_dir.exists() else []
+        if cached:
+            return cached[0]
+    path = cache_dir / (stem + suffix)
     if not path.exists():
         resp = requests.get(url, headers={"User-Agent": "indoor-generator"}, timeout=60)
         resp.raise_for_status()
+        if not suffix:
+            suffix = sniff_image_suffix(resp.content)
+            if not suffix:
+                raise ValueError(f"{url} is not an image this tool reads ({', '.join(MIME)})")
+            path = cache_dir / (stem + suffix)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(resp.content)
     return path
@@ -114,11 +136,11 @@ def basemap_images(fc: dict, cache_dir: Path, base_dir: Path | None = None,
     images, warnings = {}, []
     for bm, url in [(bm, u) for bm in fc.get("metadata", {}).get("basemaps", [])
                     for u in (bm["url"], bm.get("source_url")) if u]:
-        suffix = Path(url.split("?")[0]).suffix.lower()
         try:
             path = (files or {}).get(url) or image_file(url, cache_dir, base_dir)
+            suffix = path.suffix.lower()  # of the cached file: right even when the URL has no extension
             data = base64.b64encode(path.read_bytes()).decode("ascii")
             images[url] = f"data:{MIME.get(suffix, 'application/octet-stream')};base64,{data}"
-        except (requests.RequestException, OSError) as e:
+        except (requests.RequestException, OSError, ValueError) as e:
             warnings.append(f"basemap for level {bm['level']} not available: {e}")
     return images, warnings

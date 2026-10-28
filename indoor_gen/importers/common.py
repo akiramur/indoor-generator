@@ -25,6 +25,11 @@ def share_frames(analyses: list[dict]) -> None:
     Floor maps of one building are usually drawn at the same scale and
     position, but a single floor's outline can match the footprint badly
     (setbacks, terraces). The best-fitting floor is the most reliable.
+
+    A floor map whose outline differs a lot from the best floor's (a basement wider than the tower above it) is
+    not "the same framing" by its outline alone. An importer that knows its source draws every floor on one
+    fixed canvas sets `fixed_frame` (and `canvas`): such floors share the frame whenever the canvases are equal. For
+    Marunouchi Building B1F that is the difference between 1 and 10 of 44 surveyed shops matched.
     """
     if not analyses:
         return
@@ -32,7 +37,8 @@ def share_frames(analyses: list[dict]) -> None:
     for a in analyses:
         if a is ref:
             continue
-        if same_framing(a["outline"], ref["outline"]):
+        fixed = bool(a.get("fixed_frame") and ref.get("fixed_frame") and a.get("canvas") == ref.get("canvas"))
+        if fixed or same_framing(a["outline"], ref["outline"]):
             a["t_svg_local"] = ref["t_svg_local"]
             a["report"]["map_frame_from"] = ref["floor"]["name"]
         elif a["fit2"] < LOW_FIT:

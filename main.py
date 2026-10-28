@@ -299,12 +299,23 @@ def cmd_report(args) -> int:
     if fc is None:
         print(f"error: no indoor.geojson for {args.target}; run build first", file=sys.stderr)
         return 1
+    from indoor_gen import stacking
+
     rep = quality.report(fc)
+    cfg_path = ROOT / "configs" / f"{d.name}.json"
+    rep["listing"] = quality.listing_check(fc, quality.plan_listings(cfg_path)) if cfg_path.exists() else []
+    rep["footprint"] = quality.footprint_check(fc)
+    rep["stacking"] = stacking.report(fc)
+    rep["placement"] = quality.placement_basis(config.load_raw(cfg_path)) if cfg_path.exists() else []
     _write_atomic(d / "quality.json", json.dumps(rep, ensure_ascii=False, indent=2))
     if args.json:
         _print_json(rep)
     else:
         print(quality.format_report(rep, args.top))
+        print("\n" + quality.format_footprint(rep["footprint"]))
+        print("\n" + quality.format_listing(rep["listing"]))
+        print("\n" + quality.format_placement(rep["placement"]))
+        print("\n" + stacking.format_report(rep["stacking"]))
     return 0
 
 
@@ -562,7 +573,7 @@ def cmd_basemap(args) -> int:
     path, slug, out, frame, target, _ = setup
     src = args.image
     suffix = Path(src.split("?")[0]).suffix.lower()
-    if suffix not in build_preview.MIME:
+    if suffix not in build_preview.MIME and not (not suffix and src.startswith(("http://", "https://"))):
         _print_json({"ok": False, "error": f"unsupported image type '{suffix}' (use {', '.join(build_preview.MIME)}; "
                                            "convert a PDF page first, e.g. `sips -s format png in.pdf --out out.png`)"})
         return 1
@@ -895,7 +906,11 @@ def cmd_trace(args) -> int:
             props = {k: v for k, v in r.items() if k != "point"}
             props.setdefault("confidence", "sourced")
             features.append({"type": "Feature", "properties": props, "geometry": mapping(frame.to_wgs84(pt))})
-            report.append(f"{r['id']}: {r['name']} ({r['icon']}) {'inside' if local_fp.contains(pt) else 'OUTSIDE'} the footprint")
+            where = ("inside the footprint" if local_fp.contains(pt)
+                     else f"{local_fp.distance(pt):.1f} m outside the footprint, kept (within {generate_geojson.POI_FOOTPRINT_MARGIN_M:g} m)"
+                     if local_fp.distance(pt) <= generate_geojson.POI_FOOTPRINT_MARGIN_M
+                     else f"OUTSIDE the footprint ({local_fp.distance(pt):.0f} m), dropped at build")
+            report.append(f"{r['id']}: {r['name']} ({r['icon']}) {where}")
             continue
         poly = Polygon([to_local(p) for p in r["px"]])
         if not poly.is_valid:
@@ -907,7 +922,8 @@ def cmd_trace(args) -> int:
         report.append(f"{r['id']}: {r['name']} {poly.area:.0f} m² ({inside / poly.area * 100:.0f}% inside the footprint)")
     fc = {"type": "FeatureCollection",
           "metadata": {"floor": entry.get("name"), "traced_from": bm["image"], "source": bm.get("source"),
-                       "alignment": al.get("mode", "corners"), "geometry_source": "traced", "georef": georef},
+                       "alignment": al.get("mode", "corners"), "geometry_source": "traced", "georef": georef,
+                       **({"tenants_listed": args.listed} if getattr(args, "listed", None) is not None else {})},
           "features": features}
     dest = path.parent / "plans" / slug / f"{entry.get('name') or config.default_floor_name(args.level)}.geojson"
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -990,6 +1006,12 @@ def main(argv=None) -> int:
     p.add_argument("config")
     p.set_defaults(func=cmd_parts)
 
+    # commands in a module of their own: any indoor_gen/*_cli.py with a register() (not every checkout has them)
+    for mod in sorted((ROOT / "indoor_gen").glob("*_cli.py")):
+        importlib.import_module(f"indoor_gen.{mod.stem}").register(
+            sub, root=ROOT, out_dir=_out_dir, slug_from_arg=_slug_from_arg, write_atomic=_write_atomic,
+            print_json=_print_json)
+
     # site-specific commands: any indoor_gen/importers/*_cli.py with a register() (not every checkout has them)
     for mod in sorted((ROOT / "indoor_gen" / "importers").glob("*_cli.py")):
         importlib.import_module(f"indoor_gen.importers.{mod.stem}").register(
@@ -1015,6 +1037,9 @@ def main(argv=None) -> int:
     p.add_argument("--level", type=int, required=True)
     p.add_argument("--rooms", required=True,
                    help="JSON list of {id, name, category, px: [[x, y], ...], ...}; other keys become properties")
+    p.add_argument("--listed", type=int, metavar="N",
+                   help="how many tenants the source's own shop list gives for this floor: `report` compares it with "
+                        "the shops traced")
     p.set_defaults(func=cmd_trace)
 
     p = sub.add_parser("landmarks", help="named entrances / ticket gates around the building (for auto alignment)")

@@ -99,6 +99,25 @@ def refine(src: BaseGeometry, target: BaseGeometry, t: list[float], rounds: int 
     return best_t, best
 
 
+def fit_fixed_scale(src: BaseGeometry, target: BaseGeometry, scale: float, base: list[float] | None = None,
+                    orientations: list[tuple[int, bool]] | None = None) -> tuple[list[float], float]:
+    """`fit` with the scale given (target units per source unit): the drawing is only turned and moved.
+
+    For drawings whose scale is known (a source that draws every building at one scale): fitting the scale by overlap
+    inflates it when the drawn outline is smaller than the footprint (an outline that leaves out side wings), which
+    stretched every shop of Shin-Marunouchi 2.4-2.8x in area."""
+    base = base or IDENTITY
+    orientations = orientations or [(k, m) for k in range(4) for m in (False, True)]
+    best_t, best = None, -1.0
+    for k, m in orientations:
+        pre = compose(base, orientation(k, m), similarity(scale, 0, (0, 0), 0, 0))
+        t = compose(pre, _center_align(apply(src, pre), target))
+        t, v = refine(src, target, t, rounds=4, scale_lock=True)
+        if v > best:
+            best_t, best = t, v
+    return best_t, best
+
+
 def fit(src: BaseGeometry, target: BaseGeometry, base: list[float] | None = None,
         orientations: list[tuple[int, bool]] | None = None) -> tuple[list[float], float]:
     """Best transform mapping `src` onto `target`.

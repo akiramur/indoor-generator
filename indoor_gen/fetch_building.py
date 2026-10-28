@@ -232,6 +232,27 @@ out;"""
     return out
 
 
+def named_places(footprint: BaseGeometry, margin_m: float = 100) -> list[dict]:
+    """Every named OSM node / way / relation around the footprint (shops, rooms, entrances), as a point each: the names a
+    floor map also prints, to tell which way a map is turned (see orient.py)."""
+    c = footprint.centroid
+    hull = footprint.convex_hull
+    radius = max(_GEOD.inv(c.x, c.y, x, y)[2] for x, y in hull.exterior.coords) + margin_m
+    q = f"""[out:json][timeout:60];
+nwr["name"](around:{radius:.0f},{c.y},{c.x});
+out center tags;"""
+    out = []
+    for el in overpass(q).get("elements", []):
+        tags = el.get("tags", {})
+        pt = el if "lon" in el else el.get("center")
+        if not pt:
+            continue
+        kind = next((f"{k}={tags[k]}" for k in ("shop", "amenity", "indoor", "railway", "entrance", "building") if k in tags), "")
+        out.append({"osm": f"{el['type']}/{el['id']}", "name": tags["name"], "kind": kind, "level": tags.get("level"),
+                    "lnglat": [round(pt["lon"], 7), round(pt["lat"], 7)]})
+    return out
+
+
 def is_building_category(category: str) -> bool:
     """Nominatim `category=type` of a building, e.g. `building=yes` or `historic=building` (heritage buildings)."""
     return "building" in category.split("=")

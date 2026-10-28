@@ -26,3 +26,15 @@ def test_share_frames_uses_the_best_fit_for_floors_drawn_in_the_same_frame():
 def test_debug_svg_draws_footprint_and_labels():
     svg = common.debug_svg(box(0, 0, 10, 10), [("7", box(1, 1, 4, 4))])
     assert svg.startswith("<svg") and ">7</text>" in svg
+
+
+def test_share_frames_shares_a_fixed_canvas_even_when_the_outlines_differ():
+    best = _analysis("1F", box(0, 0, 100, 60), 0.95)
+    wider = _analysis("B1F", box(-20, -10, 120, 70), 0.8)      # a basement wider than the floors above
+    for a in (best, wider):
+        a.update(fixed_frame=True, canvas=(1200, 1200))
+    odd = _analysis("2F", box(0, 0, 40, 20), 0.5)               # fixed-frame source, but another canvas size
+    odd.update(fixed_frame=True, canvas=(600, 600))
+    common.share_frames([wider, best, odd])
+    assert wider["t_svg_local"] == "1F" and wider["report"]["map_frame_from"] == "1F"
+    assert odd["t_svg_local"] == "2F"

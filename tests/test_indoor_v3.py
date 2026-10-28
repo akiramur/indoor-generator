@@ -90,3 +90,27 @@ def test_up_bearing_is_the_compass_direction_of_the_images_top():
     assert up_bearing(east_up) == 90.0
     south_up = [north_up[2], north_up[3], north_up[0], north_up[1]]
     assert up_bearing(south_up) == 180.0
+
+
+def test_pictograms_stay_within_a_margin_of_the_footprint_and_are_dropped_beyond_it(tmp_path):
+    """A pictogram read off a floor map keeps its place up to POI_FOOTPRINT_MARGIN_M outside the footprint (the OSM
+    outline can be a few metres short); farther out it is not part of the building."""
+    footprint = box(139.7630, 35.6810, 139.7640, 35.6814)
+    lat = 35.6812
+
+    def at_east(metres):  # a point `metres` east of the footprint's east edge
+        return 139.7640 + metres / (111_320 * 0.8135)
+
+    def poi(name, metres):
+        return {"type": "Feature", "properties": {"id": name, "name": name, "icon": "toilet", "confidence": "sourced"},
+                "geometry": {"type": "Point", "coordinates": [at_east(metres), lat]}}
+
+    plan = {"type": "FeatureCollection", "metadata": {"geometry_source": "traced"},
+            "features": [poi("inside", -10), poi("close", 3), poi("far", 12)]}
+    (tmp_path / "plan.geojson").write_text(json.dumps(plan))
+    raw = {"building": {"name": "t", "source": {"type": "latlon", "lat": 35.6812, "lon": 139.763}},
+           "floors": [{"level": 1, "plan": "plan.geojson", "rooms": []}]}
+    fc = gg.generate(normalise(raw, "t", base_dir=tmp_path), footprint)
+    names = {f["properties"]["name"] for f in fc["features"] if f["properties"].get("shape_type") == "poi"}
+    assert names == {"inside", "close"}
+    assert gg.POI_FOOTPRINT_MARGIN_M == 5.0

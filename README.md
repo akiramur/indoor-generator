@@ -140,6 +140,7 @@ Every command prints its result as JSON to stdout, except `report`, which prints
 | `validate` / `build` / `serve` / `undo` | Validate a config, generate, live preview, step back one version |
 | `import-imagemap` | Import real tenant shapes from floor-guide pages drawn as HTML image maps (more site-specific importers can be added as `indoor_gen/importers/*_cli.py`, see the `indoor-importer` skill) |
 | `basemap` / `landmarks` / `align` / `trace` | Place, align and trace floor-map images |
+| `recipe` / `auto` / `orient` | Make a building's third-party floor-map images again from its `recipe.json` (sources with sha256, crop / resize steps, pixel hashes; images are never committed); run a building's stages and list what needs a person (up-to-date stages are skipped, hand edits are never overwritten); check which way a placed floor map is turned by the names printed on it vs OSM |
 | `edit-rooms` | Apply hand edits of room shapes made in the preview (move / add / delete vertices, delete / add rooms) and build |
 | `report` / `compare` / `cost` | Sourcing quality, compare two builds, estimated Claude usage cost |
 | `publish` / `viewer` | Publish all buildings as one tileset (dry run and dev by default); check the published result |

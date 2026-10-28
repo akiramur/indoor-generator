@@ -18,6 +18,10 @@ from .config import CATEGORY_COLORS, UNASSIGNED_COLOR, BuildingConfig, Floor, Ro
 from .geo_utils import LocalFrame
 
 MIN_PART_AREA = 1.0  # m², slivers below this are dropped
+# A pictogram read off a floor map is kept when it lies within this many metres of the floor's area: the footprint is
+# an OSM outline that can be a few metres short of the real building (Tokyo Station's south end, 2-4 m), and a floor map
+# is placed to a metre or two at best. Plan rooms are never cut to the footprint; pictograms get the same leeway.
+POI_FOOTPRINT_MARGIN_M = 5.0
 SLAB_THICKNESS = 0.15
 FLAT_HEIGHT = 0.2  # metres above the slab for rooms drawn flat
 COORD_PRECISION = 7
@@ -389,8 +393,9 @@ def generate(cfg: BuildingConfig, footprint_wgs84: BaseGeometry) -> dict:
             })
         # Pictograms on the floor map (toilet, lift, ...) are point POIs of their own, with no room behind them. Their
         # position is read from the drawing, a room-name POI only sits inside its room, so the pictogram wins.
+        poi_area = area.buffer(POI_FOOTPRINT_MARGIN_M)
         picts = [(pt, pt_local) for pt in floor.points
-                 for pt_local in [frame.to_local(shape(pt["geometry"]))] if area.intersects(pt_local)]
+                 for pt_local in [frame.to_local(shape(pt["geometry"]))] if poi_area.intersects(pt_local)]
         for room, rid, name, geom in pieces:
             if geom.is_empty or room.void:
                 continue

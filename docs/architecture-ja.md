@@ -165,7 +165,10 @@ indoor_gen/
   history.py                ビルド済み config のスナップショットと undo
   build_preview.py          プレビュー HTML の生成、背景地図画像の埋め込み、`templates/i18n.json` の埋め込み（`__I18N__`）、`refresh`（`preview.html` または `i18n.json` より古いページを、データはそのまま新テンプレートで作り直す）。画面は閲覧も編集も 1 つのレイアウト: 上のバー（建物ピッカー・フロア・「フロアを編集する」）、左に施設名・「表示」（元データとの比較）・タブ「凡例／出典／履歴」、右に選択中の部屋と階の部屋一覧。編集モードは左を保ち、右をツールの詳細と Table／JSON に替える
   server.py                 プレビューサーバ（静的配信 + SSE + 選択・位置合わせ・手編集・nudge・geojson.io の往復・建物切替）。`/` を配信するとき、古いページを `build_preview.refresh` で作り直す
-  quality.py                部屋ごとの根拠グレードの集計（`report`、`quality.json`）
+  quality.py                部屋ごとの根拠グレードの集計（`report`、`quality.json`）。位置の根拠（陸標か外形だけか）の表示 `placement_basis` も持つ
+  recipe.py / recipe_cli.py 第三者の画像の作り直し（`recipe`）
+  auto.py / auto_cli.py     段階実行・再開・要確認の一覧（`auto`）
+  orient.py / orient_cli.py 図の名前と OSM の名前による向きの確認（`orient`）
   compare.py                同じ建物の 2 つのビルドの比較（コスト・根拠・位置合わせ・部屋の一致度）
   usage_cost.py, pricing.json  Claude Code のセッションログから建物ごとの推定コストを算出
   publish.py                全建物を 1 つのタイルセットへ公開（Mapbox Tiling Service）
@@ -218,6 +221,9 @@ tools/                      画像・図面を読む補助スクリプト（`det
 | `nudge-map <config> [--rotate-deg --scale --east-m --north-m --level N]` | 全階（`--level` ならその階の plan・外形・フロアマップだけ）の plan・フロアマップの四隅・対応点を、外枠の中心まわりの相似変換（回転は反時計回り）で動かす（`realign.manual`）。`building.footprint_follows_map: true`（床マップから描いた footprint、例: 羽田 T2）の建物では footprint と outline のファイルも動かす。プレビューの編集モード（「フロアマップ」モード）のスライダー・ドラッグ（`POST /nudge`）から呼ばれ、調整中はブラウザで画像だけを動かして見せる |
 | `align <config> [--apply] [--reset LEVEL]` | `alignment.json` の対応点から画像の四隅を求める。`--apply` で config に反映して build、`--reset` で自動配置に戻す |
 | `trace <config> --level --rooms` | 画像ピクセル座標の部屋輪郭を、そのフロアの位置合わせ経由で plan GeoJSON に変換 |
+| `recipe <slug> [--fetch --record]` | `configs/plans/<slug>/recipe.json`（取得元 URL と sha256、`pdf_page` / `crop` / `resize` の手順、画素ハッシュ）から、第三者のフロアマップ画像（`maps/*.png`、git 管理外）を作り直す。元の図や結果が記録と違えば終了コード 1 |
+| `auto <slug> [--dry-run --only --start --force --fetch]` | recipe の段階（画像 → `cmd` のある手順 → `build` → `check`）を順に実行。入力が変わらない段階は飛ばし、手で編集された出力は上書きしない（`--force` で上書き）。`cmd` のない手順と `check` の指摘（根拠の弱さ、外形からのはみ出し、外形だけで置いた図、向きの未確定）を `review` に出す。状態は `output/<slug>/auto/state.json` |
+| `orient <config> --level N` | 置いたフロアマップの 4 通りの向きを、図の名前（`*-trace.json` の名前付き輪郭）と同名の OSM 地物との距離で採点。2 つ以上の名前が合い中央値 60 m 以下かつ次点の半分以下なら `clear` |
 | `report <target> [--top --json]` | 部屋ごとの根拠グレードをフロア別に集計し、調べ直すべき弱い部屋を列挙（`quality.json`） |
 | `compare <a> <b>` | 同じ建物の 2 ビルド（例: モデル別）をコスト・根拠・位置合わせ・部屋の一致度で比較 |
 | `cost [target]` | Claude Code のセッションログから建物ごとの推定コストを算出 |

@@ -51,7 +51,7 @@ flowchart LR
 | `indoor-floor-image` | フロアマップ画像の重ね合わせ・位置合わせ・トレース |
 | `indoor-importer` | 新しいフロアガイドサイト用 importer の追加 |
 | `indoor-quality` | 出典の弱い部屋の調査、`report` / `compare` / `cost` |
-| `indoor-publish` | タイルセットへの公開（依頼時のみ） |
+| `indoor-publish` | タイルセットへの公開（`/indoor-publish` を打ったときのみ。`disable-model-invocation: true`） |
 
 `mapbox-*` の 3 スキルは公式（mapbox-agent-skills）のコピーで、プレビューのレイヤー・性能・トークン取り扱いの変更時に参照します。
 
@@ -136,7 +136,7 @@ plan があるフロア（importer 由来）では画像は参考表示のみで
 
 `compare <a> <b>` は a が基準・b が候補（slug・config パス・出力ディレクトリ。b は別ワークツリー可）。`cost` は引数なしで全建物と `_development` / `_other` を並べる。
 
-### `indoor-publish`（公開。依頼時のみ）
+### `indoor-publish`（公開。`/indoor-publish` を打ったときのみ）
 
 全建物が 1 つのタイルセットを共有し、アップロードは**ローカルの `output/*/indoor.geojson` でソース全体を置き換える**。`output/` が不完全だと建物がタイルセットから消える。
 

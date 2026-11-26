@@ -118,7 +118,7 @@ building and starting the preview.
 - Edit: "Make the north side of 2F a meeting room"; click a room in the preview and say "make this room bigger"; "undo"
 - Floor-map images: "Overlay this image on 3F" (`indoor-floor-image`)
 - Sourcing: "Which rooms are poorly sourced?", "How much did this cost?" (`indoor-quality`)
-- Publish: "Upload it" (`indoor-publish`; runs only when you ask)
+- Publish: `/indoor-publish` (runs only when you type it; Claude does not start it)
 
 ### Run the sample
 

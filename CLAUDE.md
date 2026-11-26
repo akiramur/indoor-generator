@@ -8,7 +8,7 @@ pipeline → `output/<slug>/indoor.geojson` + live preview, then refined through
 (`.claude/skills/indoor-map/SKILL.md`).
 Its follow-ups are separate skills, loaded only when needed: `indoor-floor-image` (overlay / align / trace a floor-map image),
 `indoor-importer` (new floor-guide site importers), `indoor-quality` (sourcing grades, `report` / `compare` / `cost`),
-`indoor-publish` (tileset upload; only when the user asks).
+`indoor-publish` (tileset upload; only when the user runs `/indoor-publish`: Claude cannot start it).
 
 Official Mapbox skills vendored from [mapbox/mapbox-agent-skills](https://github.com/mapbox/mapbox-agent-skills)
 (MIT, commit `f71cd72`; `SKILL.md` + `references/` only — update by re-copying, don't edit in place):

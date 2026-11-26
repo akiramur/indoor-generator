@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python -m pytest *)",
+      "Bash(.venv/bin/python main.py validate *)",
+      "Bash(.venv/bin/python main.py locate *)",
+      "Bash(.venv/bin/python main.py report *)",
+      "Bash(.venv/bin/python main.py compare *)",
+      "Bash(.venv/bin/python main.py cost *)",
+      "Bash(curl -s localhost:8765/build_info.json)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git grep *)"
+    ]
+  }
+}

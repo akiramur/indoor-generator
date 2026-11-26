@@ -69,6 +69,6 @@ use the `indoor-quality` skill. After every build still report the build output'
 
 ## D. Publish to a Mapbox tileset
 
-Only when the user asks (「アップロードして」「タイルセットに公開」): use the `indoor-publish` skill. Never upload on your own.
+Only when the user asks (「アップロードして」「タイルセットに公開」): `indoor-publish` cannot be started by Claude (`disable-model-invocation: true`), so tell the user to run `/indoor-publish`. Never upload on your own.
 
 Preview: floors are switched with Mapbox's `IndoorControl` (bottom right, zoom ≥ 16); the chosen floor is shown flat at street level. Tell the user this when they ask how to change floors.

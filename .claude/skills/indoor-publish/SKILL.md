@@ -1,11 +1,12 @@
 ---
 name: indoor-publish
+disable-model-invocation: true
 description: Publish the built indoor maps to a Mapbox tileset (MTS) and check the upload. Use ONLY when the user explicitly asks to upload / publish ("アップロードして", "タイルセットに公開", "本番に反映", "publish the indoor maps", "show me the published tileset"). Never run on your own after a build.
 ---
 
 # Indoor map: publish to a Mapbox tileset
 
-Never upload on your own. `--upload` and `--target prod` each need an explicit request from the user in this conversation.
+Claude never starts this skill by itself (`disable-model-invocation: true`): the user runs `/indoor-publish`. Never upload on your own. `--upload` and `--target prod` each need an explicit request from the user in this conversation.
 Python: always `.venv/bin/python`. Config: `publish.json` (`username`, `targets` dev → `indoor-dev` / prod → `indoor`, `default_target`, zooms).
 
 All built buildings share ONE tileset, and an upload replaces its whole source from the local `output/*/indoor.geojson`
